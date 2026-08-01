@@ -20,7 +20,9 @@ const HEAVY_FALL_HEIGHT = 260;
 // Production feature: derive the scene from the browser's local time.
 function updateDayNightFromBrowserTime() {
   const hour = new Date().getHours();
-  document.body.classList.toggle('is-night', hour < 6 || hour >= 18);
+  const isNight = hour < 6 || hour >= 18;
+  document.body.classList.toggle('is-night', isNight);
+  document.querySelector('meta[name="theme-color"]').content = isNight ? '#263f76' : '#80d2ef';
 }
 
 function renderHunger() {
