@@ -45,7 +45,8 @@ function renderAffection() {
 
 function movePenguin() {
   if (isDragging || isFalling || pet.classList.contains('jumping')) return;
-  const next = Math.round(8 + Math.random() * 72);
+  const maxPosition = Math.max(8, ((window.innerWidth - pet.offsetWidth) / window.innerWidth) * 100);
+  const next = Math.round(4 + Math.random() * Math.max(0, maxPosition - 8));
   pet.classList.toggle('facing-left', next < position);
   position = next;
   walking = true;
@@ -156,6 +157,14 @@ function releasePenguin(event) {
 
 pet.addEventListener('pointerup', releasePenguin);
 pet.addEventListener('pointercancel', releasePenguin);
+pet.addEventListener('contextmenu', event => event.preventDefault());
+
+window.addEventListener('resize', () => {
+  if (!pet.style.top || isDragging || isFalling) return;
+  const rect = pet.getBoundingClientRect();
+  pet.style.left = `${Math.max(0, Math.min(window.innerWidth - pet.offsetWidth, rect.left))}px`;
+  pet.style.top = `${landingTop()}px`;
+});
 
 updateDayNightFromBrowserTime();
 window.setInterval(updateDayNightFromBrowserTime, 60_000);
