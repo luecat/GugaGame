@@ -1,9 +1,21 @@
 const pet = document.querySelector('#pet');
+const grass = document.querySelector('.grass');
 let position = 42;
 let walking = false;
 let clickTimer;
+let health = 5;
 let hunger = 3;
 let affection = 2;
+let isDragging = false;
+let isFalling = false;
+let suppressNextClick = false;
+let dragStartX = 0;
+let dragStartY = 0;
+let petStartLeft = 0;
+let petStartTop = 0;
+
+const FALL_DAMAGE_HEIGHT = 120;
+const HEAVY_FALL_HEIGHT = 260;
 
 // Production feature: derive the scene from the browser's local time.
 function updateDayNightFromBrowserTime() {
@@ -17,6 +29,14 @@ function renderHunger() {
   });
 }
 
+function renderHealth() {
+  const meter = document.querySelector('.health');
+  document.querySelectorAll('[data-health-icon]').forEach((icon, index) => {
+    icon.classList.toggle('is-empty', index >= health);
+  });
+  meter.setAttribute('aria-label', `血量：${health}／5`);
+}
+
 function renderAffection() {
   document.querySelectorAll('[data-affection-icon]').forEach((icon, index) => {
     icon.classList.toggle('is-empty', index >= affection);
@@ -24,7 +44,7 @@ function renderAffection() {
 }
 
 function movePenguin() {
-  if (pet.classList.contains('jumping')) return;
+  if (isDragging || isFalling || pet.classList.contains('jumping')) return;
   const next = Math.round(8 + Math.random() * 72);
   pet.classList.toggle('facing-left', next < position);
   position = next;
@@ -42,19 +62,24 @@ function scheduleWalk() {
 }
 
 function jump() {
-  if (pet.classList.contains('jumping')) return;
+  if (isDragging || isFalling || pet.classList.contains('jumping')) return;
   pet.classList.remove('walking');
   pet.classList.add('jumping');
   window.setTimeout(() => pet.classList.remove('jumping'), 620);
 }
 
 function spin() {
+  if (isDragging || isFalling) return;
   pet.classList.remove('walking');
   pet.classList.add('spinning');
   window.setTimeout(() => pet.classList.remove('spinning'), 720);
 }
 
 pet.addEventListener('click', () => {
+  if (suppressNextClick) {
+    suppressNextClick = false;
+    return;
+  }
   if (pet.classList.contains('jumping') || pet.classList.contains('spinning')) return;
   if (clickTimer) {
     window.clearTimeout(clickTimer);
@@ -67,6 +92,70 @@ pet.addEventListener('click', () => {
     jump();
   }, 250);
 });
+
+function landingTop() {
+  return grass.getBoundingClientRect().top - pet.offsetHeight + 8;
+}
+
+function showHurtEffect(damage) {
+  health = Math.max(0, health - damage);
+  renderHealth();
+  pet.classList.remove('hurt');
+  void pet.offsetWidth;
+  pet.classList.add('hurt');
+  window.setTimeout(() => pet.classList.remove('hurt'), 650);
+}
+
+pet.addEventListener('pointerdown', (event) => {
+  if (isFalling || pet.classList.contains('jumping') || pet.classList.contains('spinning')) return;
+  const rect = pet.getBoundingClientRect();
+  dragStartX = event.clientX;
+  dragStartY = event.clientY;
+  petStartLeft = rect.left;
+  petStartTop = rect.top;
+  pet.setPointerCapture(event.pointerId);
+});
+
+pet.addEventListener('pointermove', (event) => {
+  if (!pet.hasPointerCapture(event.pointerId) || isFalling) return;
+  const deltaX = event.clientX - dragStartX;
+  const deltaY = event.clientY - dragStartY;
+  if (!isDragging && Math.hypot(deltaX, deltaY) < 5) return;
+
+  isDragging = true;
+  suppressNextClick = true;
+  pet.classList.remove('walking');
+  pet.classList.add('dragging');
+  pet.style.bottom = 'auto';
+  pet.style.left = `${Math.max(0, Math.min(window.innerWidth - pet.offsetWidth, petStartLeft + deltaX))}px`;
+  pet.style.top = `${Math.max(0, Math.min(landingTop(), petStartTop + deltaY))}px`;
+});
+
+function releasePenguin(event) {
+  if (pet.hasPointerCapture(event.pointerId)) pet.releasePointerCapture(event.pointerId);
+  if (!isDragging) return;
+
+  isDragging = false;
+  isFalling = true;
+  pet.classList.remove('dragging');
+  const fallDistance = Math.max(0, landingTop() - pet.getBoundingClientRect().top);
+  const fallDuration = Math.min(.75, Math.max(.22, fallDistance / 650));
+  pet.style.setProperty('--fall-duration', `${fallDuration}s`);
+  pet.classList.add('falling');
+  pet.style.top = `${landingTop()}px`;
+
+  window.setTimeout(() => {
+    pet.classList.remove('falling');
+    isFalling = false;
+    position = (pet.getBoundingClientRect().left / window.innerWidth) * 100;
+    if (fallDistance >= FALL_DAMAGE_HEIGHT) {
+      showHurtEffect(fallDistance >= HEAVY_FALL_HEIGHT ? 2 : 1);
+    }
+  }, fallDuration * 1000 + 30);
+}
+
+pet.addEventListener('pointerup', releasePenguin);
+pet.addEventListener('pointercancel', releasePenguin);
 
 updateDayNightFromBrowserTime();
 window.setInterval(updateDayNightFromBrowserTime, 60_000);
@@ -95,5 +184,6 @@ scheduleWalk();
   });
 })();
 
+renderHealth();
 renderHunger();
 renderAffection();
