@@ -158,6 +158,8 @@ function releasePenguin(event) {
 pet.addEventListener('pointerup', releasePenguin);
 pet.addEventListener('pointercancel', releasePenguin);
 pet.addEventListener('contextmenu', event => event.preventDefault());
+pet.addEventListener('dragstart', event => event.preventDefault());
+pet.addEventListener('selectstart', event => event.preventDefault());
 
 window.addEventListener('resize', () => {
   if (!pet.style.top || isDragging || isFalling) return;

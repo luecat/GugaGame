@@ -13,7 +13,7 @@ body { margin: 0; overflow: hidden; overscroll-behavior: none; background: #8ed7
 .grass { position: absolute; inset: 72% 0 0; background: #5bad4a; border-top: 8px solid #93d878; transition: background .8s ease, border-color .8s ease; }
 .grass::before { content: ""; position: absolute; inset: -13px 0 auto; height: 15px; background: repeating-linear-gradient(110deg, transparent 0 10px, #5aad4c 11px 13px, transparent 14px 22px); }
 .pet { position: absolute; left: 42%; bottom: 19%; width: clamp(130px, 18vw, 205px); padding: 0; border: 0; outline: 0; background: transparent; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; transition: left 1.1s ease-in-out; }
-.pet img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; border: 0; box-shadow: none; user-select: none; -webkit-user-drag: none; filter: drop-shadow(0 8px 4px #2f673355); }
+.pet img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; border: 0; box-shadow: none; pointer-events: none; user-select: none; -webkit-user-select: none; -webkit-user-drag: none; -webkit-touch-callout: none; filter: drop-shadow(0 8px 4px #2f673355); }
 .pet.walking img { animation: waddle .32s ease-in-out infinite alternate; }
 .pet.facing-left { transform: scaleX(-1); }
 .pet.jumping { animation: jump .6s cubic-bezier(.28,.84,.55,1) both; pointer-events: none; }
