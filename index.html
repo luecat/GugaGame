@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>企鵝</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="world" aria-label="企鵝的草地">
+      <div class="sky" aria-hidden="true">
+        <svg class="celestial sun" viewBox="0 0 100 100" role="presentation"><circle cx="50" cy="50" r="22" /><path d="M50 5v15M50 80v15M5 50h15M80 50h15M18 18l11 11M71 71l11 11M82 18 71 29M29 71 18 82" /></svg>
+        <svg class="celestial moon" viewBox="0 0 100 100" role="presentation"><path d="M68 76A34 34 0 0 1 35 22a34 34 0 1 0 33 54Z" /></svg>
+        <svg class="cloud cloud-one" viewBox="0 0 180 100" role="presentation"><path d="M29 79h119c17 0 28-12 28-27 0-16-13-29-29-29-5 0-10 1-14 4C125 13 110 6 94 6 71 6 52 20 46 39c-4-2-8-3-13-3C17 36 4 49 4 64s11 15 25 15Z" /></svg>
+        <svg class="cloud cloud-two" viewBox="0 0 180 100" role="presentation"><path d="M29 79h119c17 0 28-12 28-27 0-16-13-29-29-29-5 0-10 1-14 4C125 13 110 6 94 6 71 6 52 20 46 39c-4-2-8-3-13-3C17 36 4 49 4 64s11 15 25 15Z" /></svg>
+      </div>
+      <aside class="hud" aria-label="企鵝狀態">
+        <div class="hud-row">
+          <span class="hud-label">血量</span>
+          <div class="meter health" aria-label="血量：滿">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 14 1 7V3h3l2 2 2-2h3v4Z" /></svg><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 14 1 7V3h3l2 2 2-2h3v4Z" /></svg><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 14 1 7V3h3l2 2 2-2h3v4Z" /></svg><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 14 1 7V3h3l2 2 2-2h3v4Z" /></svg><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 14 1 7V3h3l2 2 2-2h3v4Z" /></svg>
+          </div>
+        </div>
+        <div class="hud-row">
+          <span class="hud-label">飽食度</span>
+          <div class="meter hunger" aria-label="飽食度：滿">
+            <svg data-hunger-icon viewBox="0 0 16 16" aria-hidden="true"><path d="M2 2h5v3H5v2h5v2H8v5H5V9H2Z" /><path d="M9 2h5v5h-2v2h-2V5H9Z" /></svg><svg data-hunger-icon viewBox="0 0 16 16" aria-hidden="true"><path d="M2 2h5v3H5v2h5v2H8v5H5V9H2Z" /><path d="M9 2h5v5h-2v2h-2V5H9Z" /></svg><svg data-hunger-icon viewBox="0 0 16 16" aria-hidden="true"><path d="M2 2h5v3H5v2h5v2H8v5H5V9H2Z" /><path d="M9 2h5v5h-2v2h-2V5H9Z" /></svg><svg data-hunger-icon viewBox="0 0 16 16" aria-hidden="true"><path d="M2 2h5v3H5v2h5v2H8v5H5V9H2Z" /><path d="M9 2h5v5h-2v2h-2V5H9Z" /></svg><svg data-hunger-icon viewBox="0 0 16 16" aria-hidden="true"><path d="M2 2h5v3H5v2h5v2H8v5H5V9H2Z" /><path d="M9 2h5v5h-2v2h-2V5H9Z" /></svg>
+          </div>
+        </div>
+        <div class="hud-row">
+          <span class="hud-label">好感度</span>
+          <div class="meter affection" aria-label="好感度">
+            <svg data-affection-icon viewBox="0 0 16 16" aria-hidden="true"><path d="m8 1 2 4 5 .7-3.6 3.4.9 4.9L8 12l-4.3 2.1.9-4.9L1 5.7 6 5Z" /></svg><svg data-affection-icon viewBox="0 0 16 16" aria-hidden="true"><path d="m8 1 2 4 5 .7-3.6 3.4.9 4.9L8 12l-4.3 2.1.9-4.9L1 5.7 6 5Z" /></svg><svg data-affection-icon viewBox="0 0 16 16" aria-hidden="true"><path d="m8 1 2 4 5 .7-3.6 3.4.9 4.9L8 12l-4.3 2.1.9-4.9L1 5.7 6 5Z" /></svg><svg data-affection-icon viewBox="0 0 16 16" aria-hidden="true"><path d="m8 1 2 4 5 .7-3.6 3.4.9 4.9L8 12l-4.3 2.1.9-4.9L1 5.7 6 5Z" /></svg><svg data-affection-icon viewBox="0 0 16 16" aria-hidden="true"><path d="m8 1 2 4 5 .7-3.6 3.4.9 4.9L8 12l-4.3 2.1.9-4.9L1 5.7 6 5Z" /></svg>
+          </div>
+        </div>
+      </aside>
+      <div class="grass" aria-hidden="true"></div>
+      <button id="pet" class="pet" aria-label="點擊企鵝讓牠跳躍">
+        <img src="assets/tuanzi-square.png" alt="企鵝" />
+      </button>
+      <!-- DEBUG ONLY: This panel is deliberately separate from game controls. -->
+      <section class="debug-panel" aria-label="調試專區">
+        <span>調試專區</span>
+        <button id="debug-day-night" type="button">切換晝夜預覽</button>
+      </section>
+      <section class="feature-panel" aria-label="功能專區">
+        <button id="feed-button" type="button" aria-label="餵食企鵝">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6c-4.6-4.3-9 0-9 5.5C3 17.4 8.2 21 12 22c3.8-1 9-4.6 9-10.5C21 6 16.6 1.7 12 6Z" /><path d="M12 6c-1.5-3 1-5 4-4" /></svg>
+          餵食
+        </button>
+      </section>
+    </main>
+    <script src="app.js"></script>
+  </body>
+</html>
