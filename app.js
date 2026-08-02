@@ -33,6 +33,7 @@ let activeFood = null;
 let foodDragOffsetX = 0;
 let foodDragOffsetY = 0;
 let foodDragPointerId = null;
+let foodPointerCaptureTarget = null;
 let pendingFoodDrag = null;
 let activeFoodEdibleAt = 0;
 let feedingJumpActive = false;
@@ -174,6 +175,25 @@ function removeActiveFood() {
   activeFoodEdibleAt = 0;
 }
 
+function captureFoodPointer(element, pointerId) {
+  try {
+    element.setPointerCapture(pointerId);
+    foodPointerCaptureTarget = element;
+  } catch {
+    foodPointerCaptureTarget = null;
+  }
+}
+
+function releaseCapturedFoodPointer(pointerId) {
+  if (!foodPointerCaptureTarget) return;
+  try {
+    if (foodPointerCaptureTarget.hasPointerCapture(pointerId)) {
+      foodPointerCaptureTarget.releasePointerCapture(pointerId);
+    }
+  } catch {}
+  foodPointerCaptureTarget = null;
+}
+
 function setFeedingMode(enabled) {
   if (enabled && (isSettingsOpen() || isDead || isDragging || isFalling)) return;
   isFeedingMode = enabled;
@@ -223,11 +243,13 @@ function moveFoodWithPointer(event) {
 function releaseFoodPointer(event) {
   if (pendingFoodDrag?.pointerId === event.pointerId) {
     pendingFoodDrag = null;
+    releaseCapturedFoodPointer(event.pointerId);
     return;
   }
   if (foodDragPointerId !== event.pointerId) return;
   if (activeFood) activeFood.classList.remove('dragging');
   foodDragPointerId = null;
+  releaseCapturedFoodPointer(event.pointerId);
 }
 
 function createDraggedFood(drag, event) {
@@ -261,6 +283,7 @@ function createDraggedFood(drag, event) {
     foodDragOffsetY = event.clientY - rect.top;
     foodDragPointerId = event.pointerId;
     item.classList.add('dragging');
+    captureFoodPointer(item, event.pointerId);
   });
 }
 
@@ -268,6 +291,7 @@ function prepareFoodDrag(type, event) {
   if (!isFeedingMode || isSettingsOpen() || isDead) return;
   event.preventDefault();
   unlockGameSounds();
+  captureFoodPointer(event.currentTarget, event.pointerId);
   const artRect = event.currentTarget.querySelector('.food-art').getBoundingClientRect();
   pendingFoodDrag = {
     type,
