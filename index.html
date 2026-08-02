@@ -6,11 +6,22 @@
     <meta name="color-scheme" content="light only" />
     <meta name="supported-color-schemes" content="light" />
     <meta name="theme-color" content="#80d2ef" />
-    <title>企鵝</title>
-    <link rel="stylesheet" href="style.css?v=20260802-11" />
+    <meta name="description" content="Gugagame" />
+    <meta property="og:title" content="Gugagame" />
+    <meta property="og:description" content="Gugagame" />
+    <meta property="og:type" content="website" />
+    <title>Gugagame</title>
+    <link rel="stylesheet" href="style.css?v=20260802-16" />
   </head>
   <body>
     <main class="world" aria-label="企鵝的草地">
+      <button id="settings-button" class="settings-button" type="button" aria-label="開啟設定" aria-controls="settings-menu" aria-expanded="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12.2 2h-.4a2 2 0 0 0-2 2v.2a2 2 0 0 1-1 1.7l-.4.3a2 2 0 0 1-2 0l-.2-.1a2 2 0 0 0-2.7.7l-.2.4A2 2 0 0 0 4 9.9l.2.1a2 2 0 0 1 1 1.7v.5a2 2 0 0 1-1 1.8l-.2.1a2 2 0 0 0-.7 2.7l.2.4a2 2 0 0 0 2.7.7l.2-.1a2 2 0 0 1 2 0l.4.3a2 2 0 0 1 1 1.7v.2a2 2 0 0 0 2 2h.4a2 2 0 0 0 2-2v-.2a2 2 0 0 1 1-1.7l.4-.3a2 2 0 0 1 2 0l.2.1a2 2 0 0 0 2.7-.7l.2-.4a2 2 0 0 0-.7-2.7l-.2-.1a2 2 0 0 1-1-1.8v-.5a2 2 0 0 1 1-1.7l.2-.1a2 2 0 0 0 .7-2.7l-.2-.4a2 2 0 0 0-2.7-.7l-.2.1a2 2 0 0 1-2 0l-.4-.3a2 2 0 0 1-1-1.7V4a2 2 0 0 0-2-2Z" />
+          <circle cx="12" cy="12" r="3" />
+        </svg>
+      </button>
+      <section id="settings-menu" class="settings-menu" aria-label="設定選單" aria-hidden="true"></section>
       <div class="sky" aria-hidden="true">
         <svg class="celestial sun" viewBox="0 0 100 100" role="presentation"><circle cx="50" cy="50" r="22" /><path d="M50 5v15M50 80v15M5 50h15M80 50h15M18 18l11 11M71 71l11 11M82 18 71 29M29 71 18 82" /></svg>
         <svg class="celestial moon" viewBox="0 0 100 100" role="presentation"><path d="M68 76A34 34 0 0 1 35 22a34 34 0 1 0 33 54Z" /></svg>
@@ -68,6 +79,6 @@
         </div>
       </section>
     </main>
-    <script src="app.js?v=20260802-21"></script>
+    <script src="app.js?v=20260802-27"></script>
   </body>
 </html>
