@@ -12,6 +12,7 @@ body.settings-open .settings-button svg { transform: rotate(90deg); }
 body.settings-open .settings-menu { visibility: visible; opacity: 1; transition-delay: 0s; }
 body.settings-open .hud, body.settings-open .debug-panel, body.settings-open .feature-panel { visibility: hidden; opacity: 0; pointer-events: none; }
 body.settings-open .pet { pointer-events: none; }
+body.feeding-mode .pet { pointer-events: none; }
 .sky { position: absolute; inset: 0 0 28%; background: #80d2ef; transition: background .8s ease; }
 .celestial { position: absolute; top: 9%; left: 9%; width: clamp(52px, 7vw, 88px); transition: opacity .8s ease, transform .8s ease; }
 .sun { fill: #ffd35e; stroke: #ffd35e; stroke-width: 7; stroke-linecap: round; } .moon { left: 10%; fill: #f3f1ce; opacity: 0; transform: translateY(15px); }
@@ -36,6 +37,8 @@ body.settings-open .pet { pointer-events: none; }
 .pet.jumping { animation: jump .6s cubic-bezier(.28,.84,.55,1) both; pointer-events: none; }
 .pet.spinning { animation: spin .7s ease-in-out both; pointer-events: none; }
 .pet.crazy-flying { z-index: 7; animation: crazy-fly var(--crazy-duration, 3643ms) cubic-bezier(.36,.07,.19,.97) both; pointer-events: none; }
+.pet.feeding-chasing { transition: left .38s linear; }
+.pet.feeding-running-away { transition: left .55s ease-in; }
 .pet.dragging { z-index: 6; cursor: grabbing; transition: none; }
 .pet.falling { z-index: 6; transition: none; }
 .pet.hurt img { animation: hurt-flash .62s ease-out; }
@@ -53,6 +56,21 @@ body.settings-open .pet { pointer-events: none; }
 .debug-panel { left: 18px; } .feature-panel { right: 18px; }
 .debug-panel button, .feature-panel button { padding: 7px 9px; border: 0; border-radius: 6px; background: #38515b; color: white; cursor: pointer; font: inherit; }
 .feature-panel button { display: flex; align-items: center; justify-content: center; gap: 5px; } .feature-panel button svg { width: 15px; height: 15px; fill: #ef6f71; stroke: #ef6f71; stroke-width: 1.5; }
+.food-picker { display: none; grid-template-columns: repeat(2, minmax(72px, 1fr)); gap: 7px; }
+body.feeding-mode .food-picker { display: grid; }
+body.feeding-mode #feed-button { background: #b45b5b; }
+.food-picker button { flex-direction: column; min-height: 68px; background: #52747f; touch-action: none; user-select: none; }
+.food-picker small { color: #ffe5a3; font-size: 9px; line-height: 1; }
+.food-art { position: relative; display: block; flex: 0 0 auto; width: 30px; height: 28px; }
+.food-art-apple { width: 29px; height: 25px; margin-top: 3px; border-radius: 46% 46% 52% 52% / 42% 42% 60% 60%; background: linear-gradient(135deg, #ff7870 0 34%, #dc3e45 72%); box-shadow: inset -4px -3px 0 #a9263038, inset 3px 2px 0 #ffffff40; }
+.food-art-apple::before { content: ""; position: absolute; left: 14px; top: -8px; width: 4px; height: 10px; border-radius: 4px; background: #68462d; transform: rotate(12deg); }
+.food-art-apple::after { content: ""; position: absolute; left: 16px; top: -7px; width: 11px; height: 7px; border-radius: 90% 10% 90% 10%; background: #55a94e; transform: rotate(-17deg); }
+.food-art-stone { width: 31px; height: 25px; margin-top: 3px; border-radius: 46% 54% 42% 58% / 58% 45% 55% 42%; background: linear-gradient(145deg, #aeb8bb 0 30%, #7c898e 31% 72%, #657278 73%); box-shadow: inset 4px 3px 0 #ffffff38, inset -4px -3px 0 #34474f38; transform: rotate(-5deg); }
+.food-art-stone::after { content: ""; position: absolute; left: 8px; top: 7px; width: 9px; height: 4px; border-radius: 50%; background: #d4dcdd73; transform: rotate(-18deg); }
+.feeding-item { position: absolute; z-index: 8; display: grid; place-items: center; width: 58px; height: 58px; padding: 0; border: 0; border-radius: 50%; background: #ffffff70; box-shadow: 0 8px 18px #38515b38; cursor: grab; touch-action: none; user-select: none; line-height: 1; filter: drop-shadow(0 5px 3px #38515b38); }
+.feeding-item .food-art { transform: scale(1.45); }
+.feeding-item .food-art-stone { transform: scale(1.45) rotate(-5deg); }
+.feeding-item.dragging { cursor: grabbing; transform: scale(1.08); }
 body.is-night { background: #17284d; } body.is-night .sky { background: #263f76; } body.is-night .sun { opacity: 0; transform: translateY(15px); } body.is-night .moon { opacity: 1; transform: translateY(0); } body.is-night .cloud { fill: #aeb8d4; opacity: .25; } body.is-night .grass { background: #376e41; border-top-color: #528b57; }
 /* DEBUG ONLY: preview classes always win over the browser-clock state. */
 body.debug-force-night { background: #17284d; } body.debug-force-night .sky { background: #263f76; } body.debug-force-night .sun { opacity: 0; transform: translateY(15px); } body.debug-force-night .moon { opacity: 1; transform: translateY(0); } body.debug-force-night .cloud { fill: #aeb8d4; opacity: .35; } body.debug-force-night .grass { background: #376e41; border-top-color: #528b57; }
@@ -88,6 +106,8 @@ body.debug-force-day { background: #8ed7f4; } body.debug-force-day .sky { backgr
   .debug-panel { left: 10px; }
   .feature-panel { right: 10px; }
   .debug-panel button, .feature-panel button { min-height: 40px; padding: 8px 10px; }
+  .food-picker { grid-template-columns: repeat(2, minmax(64px, 1fr)); }
+  .feeding-item { width: 52px; height: 52px; }
 }
 
 @media (max-width: 380px) {
