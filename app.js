@@ -82,6 +82,8 @@ const FEEDING_JUMP_COOLDOWN_MS = 800;
 const FEEDING_REACH_PADDING = 22;
 const FOOD_DRAG_START_DISTANCE = 7;
 const FOOD_EAT_DELAY_MS = 1000;
+const USE_IOS_TOUCH_DRAG = /iPad|iPhone|iPod/.test(navigator.userAgent)
+  || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 let debugCloudCount = null;
 
 function getMinuteCloudCount(date = new Date()) {
@@ -252,6 +254,17 @@ function releaseFoodPointer(event) {
   releaseCapturedFoodPointer(event.pointerId);
 }
 
+function beginExistingFoodDrag(item, pointerId, clientX, clientY, captureTarget = null) {
+  if (!isFeedingMode || isSettingsOpen()) return;
+  unlockGameSounds();
+  const rect = item.getBoundingClientRect();
+  foodDragOffsetX = clientX - rect.left;
+  foodDragOffsetY = clientY - rect.top;
+  foodDragPointerId = pointerId;
+  item.classList.add('dragging');
+  if (captureTarget) captureFoodPointer(captureTarget, pointerId);
+}
+
 function createDraggedFood(drag, event) {
   removeActiveFood();
   missedFeedingJumps = 0;
@@ -275,37 +288,84 @@ function createDraggedFood(drag, event) {
   item.classList.add('dragging');
   moveFoodWithPointer(event);
   item.addEventListener('pointerdown', (event) => {
-    if (!isFeedingMode || isSettingsOpen()) return;
+    if (USE_IOS_TOUCH_DRAG && event.pointerType === 'touch') return;
     event.preventDefault();
-    unlockGameSounds();
-    const rect = item.getBoundingClientRect();
-    foodDragOffsetX = event.clientX - rect.left;
-    foodDragOffsetY = event.clientY - rect.top;
-    foodDragPointerId = event.pointerId;
-    item.classList.add('dragging');
-    captureFoodPointer(item, event.pointerId);
+    beginExistingFoodDrag(item, event.pointerId, event.clientX, event.clientY, item);
   });
+  item.addEventListener('touchstart', (event) => {
+    if (!USE_IOS_TOUCH_DRAG) return;
+    const touch = event.changedTouches[0];
+    if (!touch) return;
+    event.preventDefault();
+    beginExistingFoodDrag(item, `touch-${touch.identifier}`, touch.clientX, touch.clientY);
+  }, { passive: false });
 }
 
-function prepareFoodDrag(type, event) {
+function beginFoodDrag(type, source, pointerId, clientX, clientY) {
   if (!isFeedingMode || isSettingsOpen() || isDead) return;
-  event.preventDefault();
   unlockGameSounds();
-  captureFoodPointer(event.currentTarget, event.pointerId);
-  const artRect = event.currentTarget.querySelector('.food-art').getBoundingClientRect();
+  const artRect = source.querySelector('.food-art').getBoundingClientRect();
   pendingFoodDrag = {
     type,
-    pointerId: event.pointerId,
-    startX: event.clientX,
-    startY: event.clientY,
+    pointerId,
+    startX: clientX,
+    startY: clientY,
     sourceX: artRect.left + artRect.width / 2,
     sourceY: artRect.top + artRect.height / 2
   };
 }
 
+function prepareFoodPointerDrag(type, event) {
+  if (USE_IOS_TOUCH_DRAG && event.pointerType === 'touch') return;
+  if (!isFeedingMode || isSettingsOpen() || isDead) return;
+  event.preventDefault();
+  captureFoodPointer(event.currentTarget, event.pointerId);
+  beginFoodDrag(type, event.currentTarget, event.pointerId, event.clientX, event.clientY);
+}
+
+function prepareFoodTouchDrag(type, event) {
+  if (!USE_IOS_TOUCH_DRAG || !isFeedingMode || isSettingsOpen() || isDead) return;
+  const touch = event.changedTouches[0];
+  if (!touch) return;
+  event.preventDefault();
+  beginFoodDrag(type, event.currentTarget, `touch-${touch.identifier}`, touch.clientX, touch.clientY);
+}
+
+function findTrackedTouch(event) {
+  const pointerId = pendingFoodDrag?.pointerId ?? foodDragPointerId;
+  if (typeof pointerId !== 'string' || !pointerId.startsWith('touch-')) return null;
+  const identifier = Number(pointerId.slice(6));
+  return Array.from(event.changedTouches).find((touch) => touch.identifier === identifier)
+    ?? Array.from(event.touches).find((touch) => touch.identifier === identifier)
+    ?? null;
+}
+
+function moveFoodWithTouch(event) {
+  if (!USE_IOS_TOUCH_DRAG) return;
+  const touch = findTrackedTouch(event);
+  if (!touch) return;
+  event.preventDefault();
+  moveFoodWithPointer({
+    pointerId: `touch-${touch.identifier}`,
+    clientX: touch.clientX,
+    clientY: touch.clientY
+  });
+}
+
+function releaseFoodTouch(event) {
+  if (!USE_IOS_TOUCH_DRAG) return;
+  const touch = findTrackedTouch(event);
+  if (!touch) return;
+  event.preventDefault();
+  releaseFoodPointer({ pointerId: `touch-${touch.identifier}` });
+}
+
 document.addEventListener('pointermove', moveFoodWithPointer);
 document.addEventListener('pointerup', releaseFoodPointer);
 document.addEventListener('pointercancel', releaseFoodPointer);
+document.addEventListener('touchmove', moveFoodWithTouch, { passive: false });
+document.addEventListener('touchend', releaseFoodTouch, { passive: false });
+document.addEventListener('touchcancel', releaseFoodTouch, { passive: false });
 
 function collectFood() {
   if (!activeFood) return false;
@@ -778,7 +838,8 @@ feedButton.addEventListener('click', () => {
 });
 
 foodPicker.querySelectorAll('[data-food-type]').forEach((button) => {
-  button.addEventListener('pointerdown', (event) => prepareFoodDrag(button.dataset.foodType, event));
+  button.addEventListener('pointerdown', (event) => prepareFoodPointerDrag(button.dataset.foodType, event));
+  button.addEventListener('touchstart', (event) => prepareFoodTouchDrag(button.dataset.foodType, event), { passive: false });
 });
 
 // ===== DEBUG ONLY — isolated visual-preview control; not part of game behaviour. =====
