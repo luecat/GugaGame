@@ -6,12 +6,16 @@ const deathCause = document.querySelector('#death-cause');
 const restartButton = document.querySelector('#restart-button');
 const cloudLayer = document.querySelector('#cloud-layer');
 const cloudTemplate = document.querySelector('#cloud-template');
+const settingsButton = document.querySelector('#settings-button');
+const settingsMenu = document.querySelector('#settings-menu');
+const debugPanel = document.querySelector('.debug-panel');
+const featurePanel = document.querySelector('.feature-panel');
 let position = 42;
 let walking = false;
 let clickTimer;
 let clickCount = 0;
-let health = 5;
-let hunger = 3;
+let health = 100;
+let hunger = 6;
 let affection = 40;
 let isDragging = false;
 let isFalling = false;
@@ -36,16 +40,20 @@ const screamSound = createSound('audio/咿.wav');
 const deathSound = createSound('audio/死亡音效.wav');
 const deathNoteSound = createSound('audio/死亡筆記本.wav');
 
-const MAX_HEALTH = 5;
-const MAX_HUNGER = 5;
+const MAX_HEALTH = 100;
+const MAX_HUNGER = 10;
 const MAX_AFFECTION = 100;
+const HEALTH_UNIT = 20;
 const FALL_GRAVITY = 1900;
 const SAFE_FALL_HEIGHT = 120;
 const FALL_DAMAGE_HEIGHT_STEP = 100;
 const MAX_FALL_DAMAGE = MAX_HEALTH;
 const FULL_HUNGER_HEAL_INTERVAL = 3000;
-const FEED_AFFECTION_GAIN = 12;
-const AFFECTION_LOSS_PER_DAMAGE = 10;
+const HEAL_AMOUNT = 10;
+const HEAL_HUNGER_COST = 1;
+const FEED_HUNGER_GAIN = .5;
+const FEED_AFFECTION_GAIN = 3;
+const AFFECTION_LOSS_PER_DAMAGE = 1;
 const DEATH_RED_FLASH_DELAY = 180;
 const DEATH_SCREEN_DELAY = 500;
 const CLOUD_TRAVEL_MS = 60_000;
@@ -55,6 +63,10 @@ let debugCloudCount = null;
 
 function getMinuteCloudCount(date = new Date()) {
   return date.getMinutes() % 10;
+}
+
+function isSettingsOpen() {
+  return document.body.classList.contains('settings-open');
 }
 
 function renderClouds(count) {
@@ -77,6 +89,28 @@ function updateCloudsFromClock() {
   const count = debugCloudCount ?? getMinuteCloudCount(now);
   renderClouds(count);
 }
+
+function toggleSettings() {
+  const isOpen = document.body.classList.toggle('settings-open');
+  if (isOpen && clickTimer) {
+    window.clearTimeout(clickTimer);
+    clickTimer = undefined;
+    clickCount = 0;
+  }
+  pet.disabled = isOpen;
+  debugPanel.inert = isOpen;
+  featurePanel.inert = isOpen;
+  settingsButton.setAttribute('aria-expanded', String(isOpen));
+  settingsButton.setAttribute('aria-label', isOpen ? '關閉設定' : '開啟設定');
+  settingsMenu.setAttribute('aria-hidden', String(!isOpen));
+}
+
+settingsButton.addEventListener('click', toggleSettings);
+document.addEventListener('click', (event) => {
+  if (!isSettingsOpen()) return;
+  if (settingsMenu.contains(event.target) || settingsButton.contains(event.target)) return;
+  toggleSettings();
+});
 
 // Production feature: derive the scene from the browser's local time.
 function updateDayNightFromBrowserTime() {
@@ -110,7 +144,7 @@ function renderAffection() {
 }
 
 function movePenguin() {
-  if (isDead || isDragging || isFalling || pet.classList.contains('jumping') || pet.classList.contains('crazy-flying')) return;
+  if (isSettingsOpen() || isDead || isDragging || isFalling || pet.classList.contains('jumping') || pet.classList.contains('crazy-flying')) return;
   const maxPosition = Math.max(8, ((window.innerWidth - pet.offsetWidth) / window.innerWidth) * 100);
   const next = Math.round(4 + Math.random() * Math.max(0, maxPosition - 8));
   pet.classList.toggle('facing-left', next < position);
@@ -129,7 +163,7 @@ function scheduleWalk() {
 }
 
 function jump() {
-  if (isDead || isDragging || isFalling || pet.classList.contains('jumping')) return;
+  if (isSettingsOpen() || isDead || isDragging || isFalling || pet.classList.contains('jumping')) return;
   pet.classList.remove('walking');
   pet.classList.add('jumping');
   window.setTimeout(() => {
@@ -140,14 +174,14 @@ function jump() {
 }
 
 function spin() {
-  if (isDead || isDragging || isFalling || pet.classList.contains('crazy-flying')) return;
+  if (isSettingsOpen() || isDead || isDragging || isFalling || pet.classList.contains('crazy-flying')) return;
   pet.classList.remove('walking');
   pet.classList.add('spinning');
   window.setTimeout(() => pet.classList.remove('spinning'), 720);
 }
 
 function crazyFly() {
-  if (isDead || isDragging || isFalling) return;
+  if (isSettingsOpen() || isDead || isDragging || isFalling) return;
   walking = false;
   pet.classList.remove('walking', 'facing-left', 'jumping', 'spinning', 'crazy-flying');
   pet.style.setProperty('--crazy-x1', `${Math.round(-38 + Math.random() * 24)}vw`);
@@ -167,7 +201,7 @@ function crazyFly() {
 }
 
 pet.addEventListener('click', (event) => {
-  if (isDead) return;
+  if (isSettingsOpen() || isDead) return;
   if (suppressNextClick) {
     suppressNextClick = false;
     return;
@@ -338,7 +372,7 @@ function restartGame() {
   suppressNextClick = false;
   clickCount = 0;
   health = MAX_HEALTH;
-  hunger = 3;
+  hunger = 6;
   position = 42;
   stopSound(screamSound);
   stopSound(deathSound);
@@ -375,7 +409,8 @@ function showHurtEffect(damage, cause) {
 
 function calculateFallDamage(fallDistance) {
   if (fallDistance < SAFE_FALL_HEIGHT) return 0;
-  const damage = Math.floor((fallDistance - SAFE_FALL_HEIGHT) / FALL_DAMAGE_HEIGHT_STEP) + 1;
+  const damageLevels = Math.floor((fallDistance - SAFE_FALL_HEIGHT) / FALL_DAMAGE_HEIGHT_STEP) + 1;
+  const damage = damageLevels * HEALTH_UNIT;
   return Math.min(MAX_FALL_DAMAGE, damage);
 }
 
@@ -408,13 +443,15 @@ function fallWithGravity(startTop, targetTop, fallDistance) {
 }
 
 function healFromFullHunger() {
-  if (isDead || hunger < MAX_HUNGER || health >= MAX_HEALTH) return;
-  health = Math.min(MAX_HEALTH, health + 1);
+  if (isSettingsOpen() || isDead || hunger < MAX_HUNGER || health >= MAX_HEALTH) return;
+  health = Math.min(MAX_HEALTH, health + HEAL_AMOUNT);
+  hunger = Math.max(0, hunger - HEAL_HUNGER_COST);
   renderHealth();
+  renderHunger();
 }
 
 pet.addEventListener('pointerdown', (event) => {
-  if (isDead || isFalling || pet.classList.contains('jumping') || pet.classList.contains('spinning') || pet.classList.contains('crazy-flying')) return;
+  if (isSettingsOpen() || isDead || isFalling || pet.classList.contains('jumping') || pet.classList.contains('spinning') || pet.classList.contains('crazy-flying')) return;
   unlockGameSounds();
   const rect = pet.getBoundingClientRect();
   dragStartX = event.clientX;
@@ -477,8 +514,8 @@ scheduleWalk();
 (() => {
   const feedButton = document.querySelector('#feed-button');
   feedButton.addEventListener('click', () => {
-    if (isDead) return;
-    hunger = Math.min(MAX_HUNGER, hunger + 1);
+    if (isSettingsOpen() || isDead) return;
+    hunger = Math.min(MAX_HUNGER, hunger + FEED_HUNGER_GAIN);
     affection = Math.min(MAX_AFFECTION, affection + FEED_AFFECTION_GAIN);
     renderHunger();
     renderAffection();
@@ -501,7 +538,7 @@ scheduleWalk();
   });
   debugHurtButton.addEventListener('click', () => {
     unlockGameSounds();
-    showHurtEffect(1);
+    showHurtEffect(HEALTH_UNIT);
   });
   debugFullHungerButton.addEventListener('click', () => {
     hunger = MAX_HUNGER;
