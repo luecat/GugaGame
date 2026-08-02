@@ -14,8 +14,12 @@ let dragStartY = 0;
 let petStartLeft = 0;
 let petStartTop = 0;
 
+const MAX_HEALTH = 5;
+const MAX_HUNGER = 5;
+const MAX_AFFECTION = 5;
 const FALL_DAMAGE_HEIGHT = 120;
 const HEAVY_FALL_HEIGHT = 260;
+const FULL_HUNGER_HEAL_INTERVAL = 3000;
 
 // Production feature: derive the scene from the browser's local time.
 function updateDayNightFromBrowserTime() {
@@ -109,6 +113,12 @@ function showHurtEffect(damage) {
   window.setTimeout(() => pet.classList.remove('hurt'), 650);
 }
 
+function healFromFullHunger() {
+  if (hunger < MAX_HUNGER || health >= MAX_HEALTH) return;
+  health = Math.min(MAX_HEALTH, health + 1);
+  renderHealth();
+}
+
 pet.addEventListener('pointerdown', (event) => {
   if (isFalling || pet.classList.contains('jumping') || pet.classList.contains('spinning')) return;
   const rect = pet.getBoundingClientRect();
@@ -172,14 +182,15 @@ window.addEventListener('resize', () => {
 
 updateDayNightFromBrowserTime();
 window.setInterval(updateDayNightFromBrowserTime, 60_000);
+window.setInterval(healFromFullHunger, FULL_HUNGER_HEAL_INTERVAL);
 scheduleWalk();
 
 // Game feature controls.
 (() => {
   const feedButton = document.querySelector('#feed-button');
   feedButton.addEventListener('click', () => {
-    hunger = Math.min(5, hunger + 1);
-    affection = Math.min(5, affection + 1);
+    hunger = Math.min(MAX_HUNGER, hunger + 1);
+    affection = Math.min(MAX_AFFECTION, affection + 1);
     renderHunger();
     renderAffection();
   });
