@@ -59,14 +59,14 @@ body.feeding-mode .pet { pointer-events: none; }
 .food-picker { display: none; grid-template-columns: repeat(2, minmax(72px, 1fr)); gap: 7px; }
 body.feeding-mode .food-picker { display: grid; }
 body.feeding-mode #feed-button { background: #b45b5b; }
-.food-picker button { flex-direction: column; min-height: 68px; background: #52747f; touch-action: none; user-select: none; }
+.food-picker button { flex-direction: column; min-height: 68px; background: #52747f; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .food-art { position: relative; display: block; flex: 0 0 auto; width: 30px; height: 28px; }
 .food-art-apple { width: 29px; height: 25px; margin-top: 3px; border-radius: 46% 46% 52% 52% / 42% 42% 60% 60%; background: linear-gradient(135deg, #ff7870 0 34%, #dc3e45 72%); box-shadow: inset -4px -3px 0 #a9263038, inset 3px 2px 0 #ffffff40; }
 .food-art-apple::before { content: ""; position: absolute; left: 14px; top: -8px; width: 4px; height: 10px; border-radius: 4px; background: #68462d; transform: rotate(12deg); }
 .food-art-apple::after { content: ""; position: absolute; left: 16px; top: -7px; width: 11px; height: 7px; border-radius: 90% 10% 90% 10%; background: #55a94e; transform: rotate(-17deg); }
 .food-art-stone { width: 31px; height: 25px; margin-top: 3px; border-radius: 46% 54% 42% 58% / 58% 45% 55% 42%; background: linear-gradient(145deg, #aeb8bb 0 30%, #7c898e 31% 72%, #657278 73%); box-shadow: inset 4px 3px 0 #ffffff38, inset -4px -3px 0 #34474f38; transform: rotate(-5deg); }
 .food-art-stone::after { content: ""; position: absolute; left: 8px; top: 7px; width: 9px; height: 4px; border-radius: 50%; background: #d4dcdd73; transform: rotate(-18deg); }
-.feeding-item { position: absolute; z-index: 8; display: grid; place-items: center; width: 58px; height: 58px; padding: 0; border: 0; border-radius: 50%; background: #ffffff70; box-shadow: 0 8px 18px #38515b38; cursor: grab; touch-action: none; user-select: none; line-height: 1; filter: drop-shadow(0 5px 3px #38515b38); }
+.feeding-item { position: absolute; z-index: 8; display: grid; place-items: center; width: 58px; height: 58px; padding: 0; border: 0; border-radius: 50%; background: #ffffff70; box-shadow: 0 8px 18px #38515b38; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; line-height: 1; filter: drop-shadow(0 5px 3px #38515b38); }
 .feeding-item .food-art { transform: scale(1.45); }
 .feeding-item .food-art-stone { transform: scale(1.45) rotate(-5deg); }
 .feeding-item.dragging { cursor: grabbing; transform: scale(1.08); }
