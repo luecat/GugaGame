@@ -36,17 +36,20 @@ let foodDragPointerId = null;
 let foodPointerCaptureTarget = null;
 let pendingFoodDrag = null;
 let activeFoodEdibleAt = 0;
+let foodFallFrame;
+let foodGroundTimer;
 let feedingJumpActive = false;
 let foodCollectedDuringJump = false;
 let missedFeedingJumps = 0;
 let lastFeedingJumpAt = 0;
 const AudioContextClass = window.AudioContext || window.webkitAudioContext;
 let audioContext;
+let audioContextPrimed = false;
 
 function createSound(path) {
   const element = new Audio(path);
   element.preload = 'auto';
-  return { element, buffer: null, bufferPromise: null, unlocked: false, sources: new Set() };
+  return { element, buffer: null, bufferPromise: null, unlocked: false, unlocking: false, sources: new Set() };
 }
 
 const hurtSound = createSound('audio/痾啊.wav');
@@ -82,6 +85,8 @@ const FEEDING_JUMP_COOLDOWN_MS = 800;
 const FEEDING_REACH_PADDING = 22;
 const FOOD_DRAG_START_DISTANCE = 7;
 const FOOD_EAT_DELAY_MS = 1000;
+const FOOD_FALL_GRAVITY = 1600;
+const FOOD_GROUND_LIFETIME_MS = 500;
 const USE_IOS_TOUCH_DRAG = /iPad|iPhone|iPod/.test(navigator.userAgent)
   || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 let debugCloudCount = null;
@@ -170,11 +175,63 @@ function renderAffection() {
 }
 
 function removeActiveFood() {
+  cancelFoodFall();
   if (!activeFood) return;
   activeFood.remove();
   activeFood = null;
   foodDragPointerId = null;
   activeFoodEdibleAt = 0;
+}
+
+function cancelFoodFall() {
+  if (foodFallFrame !== undefined) {
+    window.cancelAnimationFrame(foodFallFrame);
+    foodFallFrame = undefined;
+  }
+  if (foodGroundTimer !== undefined) {
+    window.clearTimeout(foodGroundTimer);
+    foodGroundTimer = undefined;
+  }
+  if (activeFood) activeFood.classList.remove('falling', 'landed');
+}
+
+function landFood(food) {
+  if (activeFood !== food) return;
+  foodFallFrame = undefined;
+  food.classList.remove('falling');
+  food.classList.add('landed');
+  foodGroundTimer = window.setTimeout(() => {
+    if (activeFood === food && foodDragPointerId === null) removeActiveFood();
+  }, FOOD_GROUND_LIFETIME_MS);
+}
+
+function startFoodFall() {
+  if (!activeFood || foodDragPointerId !== null) return;
+  cancelFoodFall();
+  const food = activeFood;
+  const startTop = food.getBoundingClientRect().top;
+  const targetTop = grass.getBoundingClientRect().top - food.offsetHeight;
+  if (startTop >= targetTop) {
+    food.style.top = `${targetTop}px`;
+    landFood(food);
+    return;
+  }
+
+  let startedAt;
+  food.classList.add('falling');
+  const fallStep = (timestamp) => {
+    if (activeFood !== food || foodDragPointerId !== null) return;
+    if (startedAt === undefined) startedAt = timestamp;
+    const elapsedSeconds = (timestamp - startedAt) / 1000;
+    const nextTop = Math.min(targetTop, startTop + .5 * FOOD_FALL_GRAVITY * elapsedSeconds ** 2);
+    food.style.top = `${nextTop}px`;
+    if (nextTop < targetTop) {
+      foodFallFrame = window.requestAnimationFrame(fallStep);
+      return;
+    }
+    landFood(food);
+  };
+  foodFallFrame = window.requestAnimationFrame(fallStep);
 }
 
 function captureFoodPointer(element, pointerId) {
@@ -252,10 +309,12 @@ function releaseFoodPointer(event) {
   if (activeFood) activeFood.classList.remove('dragging');
   foodDragPointerId = null;
   releaseCapturedFoodPointer(event.pointerId);
+  startFoodFall();
 }
 
 function beginExistingFoodDrag(item, pointerId, clientX, clientY, captureTarget = null) {
   if (!isFeedingMode || isSettingsOpen()) return;
+  cancelFoodFall();
   unlockGameSounds();
   const rect = item.getBoundingClientRect();
   foodDragOffsetX = clientX - rect.left;
@@ -563,24 +622,50 @@ function loadSoundBuffer(sound) {
   return sound.bufferPromise;
 }
 
-function playSoundBuffer(sound) {
-  if (!audioContext || !sound.buffer) return false;
+function startSoundBuffer(sound) {
   const source = audioContext.createBufferSource();
   source.buffer = sound.buffer;
   source.connect(audioContext.destination);
   sound.sources.add(source);
   source.addEventListener('ended', () => sound.sources.delete(source), { once: true });
   source.start();
+}
+
+function playSoundBuffer(sound) {
+  if (!audioContext || !sound.buffer) return false;
+  if (audioContext.state !== 'running') {
+    audioContext.resume()
+      .then(() => {
+        if (audioContext.state === 'running') startSoundBuffer(sound);
+        else playSoundFallback(sound);
+      })
+      .catch(() => playSoundFallback(sound));
+    return true;
+  }
+  startSoundBuffer(sound);
   return true;
+}
+
+function primeAudioContext() {
+  if (!AudioContextClass) return;
+  if (!audioContext) audioContext = new AudioContextClass();
+  audioContext.resume().catch(() => {});
+  if (audioContextPrimed) return;
+  const silentBuffer = audioContext.createBuffer(1, 1, audioContext.sampleRate);
+  const silentSource = audioContext.createBufferSource();
+  silentSource.buffer = silentBuffer;
+  silentSource.connect(audioContext.destination);
+  silentSource.start(0);
+  audioContextPrimed = true;
 }
 
 function unlockSound(sound) {
   if (AudioContextClass) {
-    if (!audioContext) audioContext = new AudioContextClass();
-    audioContext.resume().catch(() => {});
+    primeAudioContext();
     loadSoundBuffer(sound);
   }
-  if (sound.unlocked) return;
+  if (sound.unlocked || sound.unlocking) return;
+  sound.unlocking = true;
   sound.element.muted = true;
   sound.element.play()
     .then(() => {
@@ -591,7 +676,8 @@ function unlockSound(sound) {
     })
     .catch(() => {
       sound.element.muted = false;
-    });
+    })
+    .finally(() => { sound.unlocking = false; });
 }
 
 function unlockGameSounds() {
@@ -602,6 +688,9 @@ function unlockGameSounds() {
   unlockSound(deathNoteSound);
   unlockSound(moralSound);
 }
+
+document.addEventListener('pointerdown', unlockGameSounds, { capture: true });
+document.addEventListener('touchstart', unlockGameSounds, { capture: true, passive: true });
 
 function playSoundFallback(sound) {
   sound.element.muted = false;
