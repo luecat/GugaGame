@@ -33,6 +33,8 @@ let activeFood = null;
 let foodDragOffsetX = 0;
 let foodDragOffsetY = 0;
 let foodDragPointerId = null;
+let pendingFoodDrag = null;
+let activeFoodEdibleAt = 0;
 let feedingJumpActive = false;
 let foodCollectedDuringJump = false;
 let missedFeedingJumps = 0;
@@ -77,6 +79,8 @@ const DEATH_NOTE_DURATION_MS = 3643;
 const FEEDING_TICK_MS = 120;
 const FEEDING_JUMP_COOLDOWN_MS = 800;
 const FEEDING_REACH_PADDING = 22;
+const FOOD_DRAG_START_DISTANCE = 7;
+const FOOD_EAT_DELAY_MS = 1000;
 let debugCloudCount = null;
 
 function getMinuteCloudCount(date = new Date()) {
@@ -167,6 +171,7 @@ function removeActiveFood() {
   activeFood.remove();
   activeFood = null;
   foodDragPointerId = null;
+  activeFoodEdibleAt = 0;
 }
 
 function setFeedingMode(enabled) {
@@ -192,6 +197,7 @@ function setFeedingMode(enabled) {
   }
 
   removeActiveFood();
+  pendingFoodDrag = null;
   feedingJumpActive = false;
   foodCollectedDuringJump = false;
   missedFeedingJumps = 0;
@@ -200,6 +206,13 @@ function setFeedingMode(enabled) {
 }
 
 function moveFoodWithPointer(event) {
+  if (pendingFoodDrag?.pointerId === event.pointerId) {
+    const distance = Math.hypot(event.clientX - pendingFoodDrag.startX, event.clientY - pendingFoodDrag.startY);
+    if (distance < FOOD_DRAG_START_DISTANCE) return;
+    const drag = pendingFoodDrag;
+    pendingFoodDrag = null;
+    createDraggedFood(drag, event);
+  }
   if (!activeFood || foodDragPointerId !== event.pointerId) return;
   const maxLeft = window.innerWidth - activeFood.offsetWidth;
   const maxTop = grass.getBoundingClientRect().top - activeFood.offsetHeight;
@@ -208,30 +221,35 @@ function moveFoodWithPointer(event) {
 }
 
 function releaseFoodPointer(event) {
+  if (pendingFoodDrag?.pointerId === event.pointerId) {
+    pendingFoodDrag = null;
+    return;
+  }
   if (foodDragPointerId !== event.pointerId) return;
   if (activeFood) activeFood.classList.remove('dragging');
   foodDragPointerId = null;
 }
 
-function spawnFoodFromPicker(type, event) {
-  if (!isFeedingMode || isSettingsOpen() || isDead) return;
-  event.preventDefault();
+function createDraggedFood(drag, event) {
   removeActiveFood();
   missedFeedingJumps = 0;
   const item = document.createElement('button');
   item.type = 'button';
-  item.className = `feeding-item feeding-item-${type}`;
-  item.dataset.foodType = type;
-  item.setAttribute('aria-label', type === 'apple' ? '可拖曳的蘋果' : '可拖曳的最愛稀有石頭');
+  item.className = `feeding-item feeding-item-${drag.type}`;
+  item.dataset.foodType = drag.type;
+  item.setAttribute('aria-label', drag.type === 'apple' ? '可拖曳的蘋果' : '可拖曳的最愛石頭');
   const art = document.createElement('span');
-  art.className = `food-art food-art-${type}`;
+  art.className = `food-art food-art-${drag.type}`;
   art.setAttribute('aria-hidden', 'true');
   item.append(art);
   world.append(item);
   activeFood = item;
-  foodDragPointerId = event.pointerId;
+  activeFoodEdibleAt = Date.now() + FOOD_EAT_DELAY_MS;
+  foodDragPointerId = drag.pointerId;
   foodDragOffsetX = item.offsetWidth / 2;
   foodDragOffsetY = item.offsetHeight / 2;
+  item.style.left = `${drag.sourceX - foodDragOffsetX}px`;
+  item.style.top = `${drag.sourceY - foodDragOffsetY}px`;
   item.classList.add('dragging');
   moveFoodWithPointer(event);
   item.addEventListener('pointerdown', (event) => {
@@ -244,6 +262,21 @@ function spawnFoodFromPicker(type, event) {
     foodDragPointerId = event.pointerId;
     item.classList.add('dragging');
   });
+}
+
+function prepareFoodDrag(type, event) {
+  if (!isFeedingMode || isSettingsOpen() || isDead) return;
+  event.preventDefault();
+  unlockGameSounds();
+  const artRect = event.currentTarget.querySelector('.food-art').getBoundingClientRect();
+  pendingFoodDrag = {
+    type,
+    pointerId: event.pointerId,
+    startX: event.clientX,
+    startY: event.clientY,
+    sourceX: artRect.left + artRect.width / 2,
+    sourceY: artRect.top + artRect.height / 2
+  };
 }
 
 document.addEventListener('pointermove', moveFoodWithPointer);
@@ -265,7 +298,7 @@ function collectFood() {
 }
 
 function tryCollectFood() {
-  if (!activeFood || hunger >= MAX_HUNGER) return false;
+  if (!activeFood || Date.now() < activeFoodEdibleAt || hunger >= MAX_HUNGER) return false;
   const foodRect = activeFood.getBoundingClientRect();
   const petRect = pet.getBoundingClientRect();
   const foodX = foodRect.left + foodRect.width / 2;
@@ -285,7 +318,7 @@ function startFeedingJump() {
   window.setTimeout(tryCollectFood, 300);
   window.setTimeout(() => {
     feedingJumpActive = false;
-    if (!isFeedingMode || !activeFood || foodCollectedDuringJump) return;
+    if (!isFeedingMode || !activeFood || foodCollectedDuringJump || Date.now() < activeFoodEdibleAt) return;
     missedFeedingJumps += 1;
     if (missedFeedingJumps < 3) return;
     missedFeedingJumps = 0;
@@ -721,7 +754,7 @@ feedButton.addEventListener('click', () => {
 });
 
 foodPicker.querySelectorAll('[data-food-type]').forEach((button) => {
-  button.addEventListener('pointerdown', (event) => spawnFoodFromPicker(button.dataset.foodType, event));
+  button.addEventListener('pointerdown', (event) => prepareFoodDrag(button.dataset.foodType, event));
 });
 
 // ===== DEBUG ONLY — isolated visual-preview control; not part of game behaviour. =====
