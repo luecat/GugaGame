@@ -47,7 +47,7 @@ let audioContext;
 let audioContextPrimed = false;
 let gameAudioActivated = false;
 let genshinSoundPending = false;
-let previousCloudCount = null;
+let genshinSoundPlayed = false;
 
 function createSound(path) {
   const element = new Audio(path);
@@ -118,13 +118,16 @@ function renderClouds(count) {
     cloudLayer.append(cloud);
   }
 
-  if (count === 9 && previousCloudCount !== 9) {
-    if (gameAudioActivated) playSound(genshinSound);
-    else genshinSoundPending = true;
+  if (count === 9 && !genshinSoundPlayed && !genshinSoundPending) {
+    if (gameAudioActivated) {
+      genshinSoundPlayed = true;
+      playSound(genshinSound);
+    } else {
+      genshinSoundPending = true;
+    }
   } else if (count !== 9) {
     genshinSoundPending = false;
   }
-  previousCloudCount = count;
 }
 
 function updateCloudsFromClock() {
@@ -198,10 +201,18 @@ function renderAffection() {
 function removeActiveFood() {
   cancelFoodFall();
   if (!activeFood) return;
+  const wasMovingForFood = pet.classList.contains('feeding-chasing')
+    || pet.classList.contains('feeding-running-away');
+  const currentPetLeft = wasMovingForFood ? pet.getBoundingClientRect().left : 0;
   activeFood.remove();
   activeFood = null;
   foodDragPointerId = null;
   activeFoodEdibleAt = 0;
+  pet.classList.remove('feeding-chasing', 'feeding-running-away', 'walking');
+  if (wasMovingForFood) {
+    pet.style.left = `${currentPetLeft}px`;
+    position = (currentPetLeft / window.innerWidth) * 100;
+  }
 }
 
 function cancelFoodFall() {
@@ -712,6 +723,7 @@ function unlockGameSounds() {
   unlockSound(genshinSound);
   if (genshinSoundPending) {
     genshinSoundPending = false;
+    genshinSoundPlayed = true;
     window.setTimeout(() => playSound(genshinSound), 0);
   }
 }
