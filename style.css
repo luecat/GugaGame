@@ -5,8 +5,8 @@ body { margin: 0; overflow: hidden; overscroll-behavior: none; background: #8ed7
 .sky { position: absolute; inset: 0 0 28%; background: #80d2ef; transition: background .8s ease; }
 .celestial { position: absolute; top: 9%; left: 9%; width: clamp(52px, 7vw, 88px); transition: opacity .8s ease, transform .8s ease; }
 .sun { fill: #ffd35e; stroke: #ffd35e; stroke-width: 7; stroke-linecap: round; } .moon { left: 10%; fill: #f3f1ce; opacity: 0; transform: translateY(15px); }
-.cloud { position: absolute; width: clamp(110px, 15vw, 190px); fill: #fff; opacity: .62; filter: drop-shadow(0 4px 0 #ffffff40); animation: drift 19s linear infinite; }
-.cloud-one { top: 10%; left: 13%; } .cloud-two { top: 27%; right: 15%; width: clamp(75px, 10vw, 125px); animation-delay: -7s; }
+.cloud-layer { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.cloud { position: absolute; left: 0; width: var(--cloud-width, 140px); fill: #fff; opacity: .62; filter: drop-shadow(0 4px 0 #ffffff40); animation: cloud-cross 60s linear infinite; }
 .hud { position: absolute; z-index: 3; top: 24px; right: 24px; width: 164px; height: 164px; padding: 16px; display: grid; align-content: center; justify-items: stretch; gap: 12px; border: 0; border-radius: 18px; background: #ffffffb8; }
 .hud-row { display: grid; width: 100%; justify-items: start; gap: 2px; } .hud-label { color: #36576a; font-size: 12px; font-weight: 800; letter-spacing: .04em; }
 .stat-meter { width: 100%; }
@@ -25,10 +25,11 @@ body { margin: 0; overflow: hidden; overscroll-behavior: none; background: #8ed7
 .pet.facing-left { transform: scaleX(-1); }
 .pet.jumping { animation: jump .6s cubic-bezier(.28,.84,.55,1) both; pointer-events: none; }
 .pet.spinning { animation: spin .7s ease-in-out both; pointer-events: none; }
+.pet.crazy-flying { z-index: 7; animation: crazy-fly var(--crazy-duration, 3643ms) cubic-bezier(.36,.07,.19,.97) both; pointer-events: none; }
 .pet.dragging { z-index: 6; cursor: grabbing; transition: none; }
 .pet.falling { z-index: 6; transition: none; }
 .pet.hurt img { animation: hurt-flash .62s ease-out; }
-.world.is-dying::after { content: ""; position: fixed; inset: 0; z-index: 40; pointer-events: none; background: #b0000038; animation: death-flash .78s steps(2, end) both; }
+.world.is-dying::after { content: ""; position: fixed; inset: 0; z-index: 40; pointer-events: none; background: #b00000b8; animation: death-flash .18s ease-out both; }
 .pet.death-jumpscare { position: fixed; z-index: 50; left: 50% !important; top: 50% !important; bottom: auto !important; width: min(135vw, 135vh, 1050px); pointer-events: none; transition: none; animation: death-jumpscare .38s cubic-bezier(.05,.95,.12,1) both; }
 .pet.death-jumpscare img { filter: sepia(.35) saturate(1.8) hue-rotate(315deg) contrast(1.08) drop-shadow(0 18px 18px #31000088); }
 .death-screen { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 24px; visibility: hidden; opacity: 0; pointer-events: none; background: #750000c9; color: white; text-align: center; transition: opacity .22s ease, visibility 0s linear .22s; }
@@ -49,10 +50,18 @@ body.debug-force-day { background: #8ed7f4; } body.debug-force-day .sky { backgr
 @keyframes waddle { to { transform: rotate(3deg) translateY(-2px); } }
 @keyframes jump { 45% { translate: 0 -105px; } 100% { translate: 0 0; } }
 @keyframes spin { from { rotate: 0deg; } to { rotate: 360deg; } }
+@keyframes crazy-fly {
+  0% { transform: translate(0, 0) rotate(0deg) scale(1); }
+  18% { transform: translate(var(--crazy-x1), -28vh) rotate(720deg) scale(.82); }
+  39% { transform: translate(var(--crazy-x2), -42vh) rotate(1620deg) scale(1.16); }
+  61% { transform: translate(var(--crazy-x3), 8vh) rotate(2520deg) scale(.9); }
+  82% { transform: translate(var(--crazy-x1), -18vh) rotate(3240deg) scale(1.12); }
+  100% { transform: translate(0, 0) rotate(3600deg) scale(1); }
+}
 @keyframes hurt-flash { 0%, 100% { filter: drop-shadow(0 8px 4px #2f673355); } 15%, 70% { filter: drop-shadow(0 8px 4px #8c1d1d66) sepia(1) saturate(10) hue-rotate(310deg) brightness(1.05); } 42% { filter: drop-shadow(0 8px 4px #8c1d1d66) sepia(1) saturate(10) hue-rotate(310deg) brightness(1.25); } }
 @keyframes death-jumpscare { 0% { transform: translate(-50%, -50%) scale(.08) rotate(0); } 18% { transform: translate(-54%, -46%) scale(.48) rotate(-4deg); } 42% { transform: translate(-47%, -53%) scale(1.18) rotate(4deg); } 62% { transform: translate(-52%, -48%) scale(.98) rotate(-3deg); } 82% { transform: translate(-48%, -52%) scale(1.08) rotate(2deg); } 100% { transform: translate(-50%, -50%) scale(1.04) rotate(0); } }
-@keyframes death-flash { 0% { opacity: 0; } 28% { opacity: 1; } 48% { opacity: .25; } 72%, 100% { opacity: 1; } }
-@keyframes drift { from { translate: 0 0; } 50% { translate: 55px 2px; } to { translate: 0 0; } }
+@keyframes death-flash { from { opacity: 0; } to { opacity: 1; } }
+@keyframes cloud-cross { from { transform: translateX(calc(-100% - 24px)); } to { transform: translateX(calc(100vw + 24px)); } }
 @media (max-width: 600px) {
   .sky { inset-bottom: 36%; }
   .grass { inset-top: 64%; }
@@ -67,8 +76,6 @@ body.debug-force-day { background: #8ed7f4; } body.debug-force-day .sky { backgr
   .debug-panel { left: 10px; }
   .feature-panel { right: 10px; }
   .debug-panel button, .feature-panel button { min-height: 40px; padding: 8px 10px; }
-  .cloud-one { left: 7%; }
-  .cloud-two { top: 35%; right: 8%; }
 }
 
 @media (max-width: 380px) {
