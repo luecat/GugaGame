@@ -4,9 +4,12 @@ const world = document.querySelector('.world');
 const deathScreen = document.querySelector('#death-screen');
 const deathCause = document.querySelector('#death-cause');
 const restartButton = document.querySelector('#restart-button');
+const cloudLayer = document.querySelector('#cloud-layer');
+const cloudTemplate = document.querySelector('#cloud-template');
 let position = 42;
 let walking = false;
 let clickTimer;
+let clickCount = 0;
 let health = 5;
 let hunger = 3;
 let affection = 40;
@@ -31,6 +34,7 @@ const hurtSound = createSound('audio/痾啊.wav');
 const landingSound = createSound('audio/落地.wav');
 const screamSound = createSound('audio/咿.wav');
 const deathSound = createSound('audio/死亡音效.wav');
+const deathNoteSound = createSound('audio/死亡筆記本.wav');
 
 const MAX_HEALTH = 5;
 const MAX_HUNGER = 5;
@@ -42,7 +46,37 @@ const MAX_FALL_DAMAGE = MAX_HEALTH;
 const FULL_HUNGER_HEAL_INTERVAL = 3000;
 const FEED_AFFECTION_GAIN = 12;
 const AFFECTION_LOSS_PER_DAMAGE = 10;
+const DEATH_RED_FLASH_DELAY = 180;
 const DEATH_SCREEN_DELAY = 500;
+const CLOUD_TRAVEL_MS = 60_000;
+const MULTI_CLICK_DELAY = 500;
+const DEATH_NOTE_DURATION_MS = 3643;
+let debugCloudCount = null;
+
+function getMinuteCloudCount(date = new Date()) {
+  return date.getMinutes() % 10;
+}
+
+function renderClouds(count) {
+  cloudLayer.replaceChildren();
+
+  for (let index = 0; index < count; index += 1) {
+    const cloud = cloudTemplate.content.firstElementChild.cloneNode(true);
+    const top = 4 + Math.random() * 52;
+    const width = 80 + Math.random() * 115;
+    const phase = (index + .2 + Math.random() * .6) / count;
+    cloud.style.top = `${top}%`;
+    cloud.style.setProperty('--cloud-width', `${width}px`);
+    cloud.style.animationDelay = `${-phase * CLOUD_TRAVEL_MS}ms`;
+    cloudLayer.append(cloud);
+  }
+}
+
+function updateCloudsFromClock() {
+  const now = new Date();
+  const count = debugCloudCount ?? getMinuteCloudCount(now);
+  renderClouds(count);
+}
 
 // Production feature: derive the scene from the browser's local time.
 function updateDayNightFromBrowserTime() {
@@ -76,7 +110,7 @@ function renderAffection() {
 }
 
 function movePenguin() {
-  if (isDead || isDragging || isFalling || pet.classList.contains('jumping')) return;
+  if (isDead || isDragging || isFalling || pet.classList.contains('jumping') || pet.classList.contains('crazy-flying')) return;
   const maxPosition = Math.max(8, ((window.innerWidth - pet.offsetWidth) / window.innerWidth) * 100);
   const next = Math.round(4 + Math.random() * Math.max(0, maxPosition - 8));
   pet.classList.toggle('facing-left', next < position);
@@ -106,29 +140,54 @@ function jump() {
 }
 
 function spin() {
-  if (isDead || isDragging || isFalling) return;
+  if (isDead || isDragging || isFalling || pet.classList.contains('crazy-flying')) return;
   pet.classList.remove('walking');
   pet.classList.add('spinning');
   window.setTimeout(() => pet.classList.remove('spinning'), 720);
 }
 
-pet.addEventListener('click', () => {
+function crazyFly() {
+  if (isDead || isDragging || isFalling) return;
+  walking = false;
+  pet.classList.remove('walking', 'facing-left', 'jumping', 'spinning', 'crazy-flying');
+  pet.style.setProperty('--crazy-x1', `${Math.round(-38 + Math.random() * 24)}vw`);
+  pet.style.setProperty('--crazy-x2', `${Math.round(18 + Math.random() * 24)}vw`);
+  pet.style.setProperty('--crazy-x3', `${Math.round(-30 + Math.random() * 60)}vw`);
+  pet.style.setProperty('--crazy-duration', `${DEATH_NOTE_DURATION_MS}ms`);
+  void pet.offsetWidth;
+  pet.classList.add('crazy-flying');
+  playSound(deathNoteSound);
+  window.setTimeout(() => {
+    pet.classList.remove('crazy-flying');
+    pet.style.removeProperty('--crazy-x1');
+    pet.style.removeProperty('--crazy-x2');
+    pet.style.removeProperty('--crazy-x3');
+    pet.style.removeProperty('--crazy-duration');
+  }, DEATH_NOTE_DURATION_MS);
+}
+
+pet.addEventListener('click', (event) => {
   if (isDead) return;
   if (suppressNextClick) {
     suppressNextClick = false;
     return;
   }
-  if (pet.classList.contains('jumping') || pet.classList.contains('spinning')) return;
-  if (clickTimer) {
-    window.clearTimeout(clickTimer);
+  if (pet.classList.contains('jumping') || pet.classList.contains('spinning') || pet.classList.contains('crazy-flying')) return;
+  clickCount = Math.max(clickCount + 1, event.detail);
+  window.clearTimeout(clickTimer);
+  if (clickCount >= 3) {
     clickTimer = undefined;
-    spin();
+    clickCount = 0;
+    crazyFly();
     return;
   }
   clickTimer = window.setTimeout(() => {
     clickTimer = undefined;
-    jump();
-  }, 250);
+    const completedClicks = clickCount;
+    clickCount = 0;
+    if (completedClicks === 2) spin();
+    else jump();
+  }, MULTI_CLICK_DELAY);
 });
 
 function landingTop() {
@@ -190,6 +249,7 @@ function unlockGameSounds() {
   unlockSound(landingSound);
   unlockSound(screamSound);
   unlockSound(deathSound);
+  unlockSound(deathNoteSound);
 }
 
 function playSoundFallback(sound) {
@@ -246,7 +306,8 @@ function triggerDeath(cause = '企鵝失去了所有血量') {
     window.clearTimeout(clickTimer);
     clickTimer = undefined;
   }
-  pet.classList.remove('walking', 'facing-left', 'jumping', 'spinning', 'dragging', 'falling', 'hurt');
+  clickCount = 0;
+  pet.classList.remove('walking', 'facing-left', 'jumping', 'spinning', 'crazy-flying', 'dragging', 'falling', 'hurt');
   world.classList.add('is-dying');
   deathCause.textContent = cause;
   const syncScreamWithJumpscare = (event) => {
@@ -265,7 +326,9 @@ function triggerDeath(cause = '企鵝失去了所有血量') {
     }, DEATH_SCREEN_DELAY);
   };
   pet.addEventListener('animationstart', syncScreamWithJumpscare);
-  pet.classList.add('death-jumpscare');
+  window.setTimeout(() => {
+    if (isDead) pet.classList.add('death-jumpscare');
+  }, DEATH_RED_FLASH_DELAY);
 }
 
 function restartGame() {
@@ -273,11 +336,13 @@ function restartGame() {
   isDragging = false;
   isFalling = false;
   suppressNextClick = false;
+  clickCount = 0;
   health = MAX_HEALTH;
   hunger = 3;
   position = 42;
   stopSound(screamSound);
   stopSound(deathSound);
+  stopSound(deathNoteSound);
   world.classList.remove('is-dying');
   deathScreen.classList.remove('is-visible');
   deathScreen.setAttribute('aria-hidden', 'true');
@@ -349,7 +414,7 @@ function healFromFullHunger() {
 }
 
 pet.addEventListener('pointerdown', (event) => {
-  if (isDead || isFalling || pet.classList.contains('jumping') || pet.classList.contains('spinning')) return;
+  if (isDead || isFalling || pet.classList.contains('jumping') || pet.classList.contains('spinning') || pet.classList.contains('crazy-flying')) return;
   unlockGameSounds();
   const rect = pet.getBoundingClientRect();
   dragStartX = event.clientX;
@@ -402,7 +467,9 @@ window.addEventListener('resize', () => {
 });
 
 updateDayNightFromBrowserTime();
+updateCloudsFromClock();
 window.setInterval(updateDayNightFromBrowserTime, 60_000);
+window.setInterval(updateCloudsFromClock, CLOUD_TRAVEL_MS);
 window.setInterval(healFromFullHunger, FULL_HUNGER_HEAL_INTERVAL);
 scheduleWalk();
 
@@ -423,6 +490,7 @@ scheduleWalk();
   const debugButton = document.querySelector('#debug-day-night');
   const debugHurtButton = document.querySelector('#debug-hurt');
   const debugFullHungerButton = document.querySelector('#debug-full-hunger');
+  const debugCloudCountButton = document.querySelector('#debug-cloud-count');
   const debugDeathButton = document.querySelector('#debug-death');
   let previewNight = document.body.classList.contains('is-night');
   debugButton.addEventListener('click', () => {
@@ -439,6 +507,12 @@ scheduleWalk();
     hunger = MAX_HUNGER;
     renderHunger();
     healFromFullHunger();
+  });
+  debugCloudCountButton.addEventListener('click', () => {
+    const currentCount = debugCloudCount ?? cloudLayer.childElementCount;
+    debugCloudCount = (currentCount + 1) % 10;
+    renderClouds(debugCloudCount);
+    debugCloudCountButton.textContent = `改雲數量：${debugCloudCount}`;
   });
   debugDeathButton.addEventListener('click', () => {
     unlockGameSounds();
