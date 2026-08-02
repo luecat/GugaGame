@@ -237,7 +237,7 @@ function createDraggedFood(drag, event) {
   item.type = 'button';
   item.className = `feeding-item feeding-item-${drag.type}`;
   item.dataset.foodType = drag.type;
-  item.setAttribute('aria-label', drag.type === 'apple' ? '可拖曳的蘋果' : '可拖曳的最愛石頭');
+  item.setAttribute('aria-label', drag.type === 'apple' ? '可拖曳的蘋果' : '可拖曳的石頭');
   const art = document.createElement('span');
   art.className = `food-art food-art-${drag.type}`;
   art.setAttribute('aria-hidden', 'true');
