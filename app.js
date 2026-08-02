@@ -13,13 +13,17 @@ let dragStartX = 0;
 let dragStartY = 0;
 let petStartLeft = 0;
 let petStartTop = 0;
-const hurtSound = new Audio('痾啊.wav');
-hurtSound.preload = 'auto';
-let hurtSoundUnlocked = false;
 const AudioContextClass = window.AudioContext || window.webkitAudioContext;
 let audioContext;
-let hurtSoundBuffer;
-let hurtSoundBufferPromise;
+
+function createSound(path) {
+  const element = new Audio(path);
+  element.preload = 'auto';
+  return { element, buffer: null, bufferPromise: null, unlocked: false };
+}
+
+const hurtSound = createSound('痾啊.wav');
+const landingSound = createSound('落地.ogg');
 
 const MAX_HEALTH = 5;
 const MAX_HUNGER = 5;
@@ -40,25 +44,25 @@ function updateDayNightFromBrowserTime() {
 }
 
 function renderHunger() {
-  document.querySelectorAll('[data-hunger-icon]').forEach((icon, index) => {
-    icon.classList.toggle('is-empty', index >= hunger);
-  });
+  const meter = document.querySelector('.hunger');
+  const fill = document.querySelector('.hunger-fill');
+  const percentage = (hunger / MAX_HUNGER) * 100;
+  fill.style.width = `${percentage}%`;
+  meter.setAttribute('aria-label', `飽食度：${percentage}%`);
 }
 
 function renderHealth() {
   const meter = document.querySelector('.health');
-  document.querySelectorAll('[data-health-icon]').forEach((icon, index) => {
-    icon.classList.toggle('is-empty', index >= health);
-  });
-  meter.setAttribute('aria-label', `血量：${health}／5`);
+  const fill = document.querySelector('.health-fill');
+  const percentage = (health / MAX_HEALTH) * 100;
+  fill.style.width = `${percentage}%`;
+  meter.setAttribute('aria-label', `血量：${percentage}%`);
 }
 
 function renderAffection() {
   const meter = document.querySelector('.affection');
   const fill = document.querySelector('.affection-fill');
-  const value = document.querySelector('.affection-value');
   fill.style.width = `${affection}%`;
-  value.textContent = `${affection}%`;
   meter.setAttribute('aria-label', `好感度：${affection}%`);
 }
 
@@ -85,7 +89,10 @@ function jump() {
   if (isDragging || isFalling || pet.classList.contains('jumping')) return;
   pet.classList.remove('walking');
   pet.classList.add('jumping');
-  window.setTimeout(() => pet.classList.remove('jumping'), 620);
+  window.setTimeout(() => {
+    pet.classList.remove('jumping');
+    playLandingSound();
+  }, 620);
 }
 
 function spin() {
@@ -117,70 +124,83 @@ function landingTop() {
   return grass.getBoundingClientRect().top - pet.offsetHeight + 8;
 }
 
-function loadHurtSoundBuffer() {
+function loadSoundBuffer(sound) {
   if (!AudioContextClass) return Promise.resolve(null);
   if (!audioContext) audioContext = new AudioContextClass();
-  if (!hurtSoundBufferPromise) {
-    hurtSoundBufferPromise = fetch(hurtSound.src, { cache: 'force-cache' })
+  if (!sound.bufferPromise) {
+    sound.bufferPromise = fetch(sound.element.src, { cache: 'force-cache' })
       .then((response) => {
         if (!response.ok) throw new Error(`Audio request failed: ${response.status}`);
         return response.arrayBuffer();
       })
       .then((audioData) => audioContext.decodeAudioData(audioData))
       .then((buffer) => {
-        hurtSoundBuffer = buffer;
+        sound.buffer = buffer;
         return buffer;
       })
       .catch(() => null);
   }
-  return hurtSoundBufferPromise;
+  return sound.bufferPromise;
 }
 
-function playHurtSoundBuffer() {
-  if (!audioContext || !hurtSoundBuffer) return false;
+function playSoundBuffer(sound) {
+  if (!audioContext || !sound.buffer) return false;
   const source = audioContext.createBufferSource();
-  source.buffer = hurtSoundBuffer;
+  source.buffer = sound.buffer;
   source.connect(audioContext.destination);
   source.start();
   return true;
 }
 
-function unlockHurtSound() {
+function unlockSound(sound) {
   if (AudioContextClass) {
     if (!audioContext) audioContext = new AudioContextClass();
     audioContext.resume().catch(() => {});
-    loadHurtSoundBuffer();
+    loadSoundBuffer(sound);
   }
-  if (hurtSoundUnlocked) return;
-  hurtSound.muted = true;
-  hurtSound.play()
+  if (sound.unlocked) return;
+  sound.element.muted = true;
+  sound.element.play()
     .then(() => {
-      hurtSound.pause();
-      hurtSound.currentTime = 0;
-      hurtSound.muted = false;
-      hurtSoundUnlocked = true;
+      sound.element.pause();
+      sound.element.currentTime = 0;
+      sound.element.muted = false;
+      sound.unlocked = true;
     })
     .catch(() => {
-      hurtSound.muted = false;
+      sound.element.muted = false;
     });
 }
 
-function playHurtSoundFallback() {
-  hurtSound.muted = false;
-  hurtSound.currentTime = 0;
-  hurtSound.play().catch(() => {});
+function unlockGameSounds() {
+  unlockSound(hurtSound);
+  unlockSound(landingSound);
 }
 
-function playHurtSound() {
-  if (playHurtSoundBuffer()) return;
+function playSoundFallback(sound) {
+  sound.element.muted = false;
+  sound.element.currentTime = 0;
+  sound.element.play().catch(() => {});
+}
+
+function playSound(sound) {
+  if (playSoundBuffer(sound)) return;
   if (AudioContextClass) {
-    loadHurtSoundBuffer().then((buffer) => {
-      if (buffer) playHurtSoundBuffer();
-      else playHurtSoundFallback();
+    loadSoundBuffer(sound).then((buffer) => {
+      if (buffer) playSoundBuffer(sound);
+      else playSoundFallback(sound);
     });
     return;
   }
-  playHurtSoundFallback();
+  playSoundFallback(sound);
+}
+
+function playHurtSound() {
+  playSound(hurtSound);
+}
+
+function playLandingSound() {
+  playSound(landingSound);
 }
 
 function showHurtEffect(damage) {
@@ -203,7 +223,7 @@ function healFromFullHunger() {
 
 pet.addEventListener('pointerdown', (event) => {
   if (isFalling || pet.classList.contains('jumping') || pet.classList.contains('spinning')) return;
-  unlockHurtSound();
+  unlockGameSounds();
   const rect = pet.getBoundingClientRect();
   dragStartX = event.clientX;
   dragStartY = event.clientY;
@@ -244,6 +264,7 @@ function releasePenguin(event) {
     pet.classList.remove('falling');
     isFalling = false;
     position = (pet.getBoundingClientRect().left / window.innerWidth) * 100;
+    playLandingSound();
     if (fallDistance >= FALL_DAMAGE_HEIGHT) {
       showHurtEffect(fallDistance >= HEAVY_FALL_HEIGHT ? 2 : 1);
     }
@@ -292,7 +313,7 @@ scheduleWalk();
     debugButton.textContent = previewNight ? '切換至白天預覽' : '切換至夜晚預覽';
   });
   debugHurtButton.addEventListener('click', () => {
-    unlockHurtSound();
+    unlockGameSounds();
     showHurtEffect(1);
   });
   debugFullHungerButton.addEventListener('click', () => {
