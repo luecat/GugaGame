@@ -7,7 +7,7 @@
     <meta name="supported-color-schemes" content="light" />
     <meta name="theme-color" content="#80d2ef" />
     <title>企鵝</title>
-    <link rel="stylesheet" href="style.css?v=20260802-1" />
+    <link rel="stylesheet" href="style.css?v=20260802-3" />
   </head>
   <body>
     <main class="world" aria-label="企鵝的草地">
@@ -20,14 +20,14 @@
       <aside class="hud" aria-label="企鵝狀態">
         <div class="hud-row">
           <span class="hud-label">血量</span>
-          <div class="meter health" aria-label="血量：滿">
-            <svg data-health-icon viewBox="0 0 16 16" aria-hidden="true"><path d="M8 14 1 7V3h3l2 2 2-2h3v4Z" /></svg><svg data-health-icon viewBox="0 0 16 16" aria-hidden="true"><path d="M8 14 1 7V3h3l2 2 2-2h3v4Z" /></svg><svg data-health-icon viewBox="0 0 16 16" aria-hidden="true"><path d="M8 14 1 7V3h3l2 2 2-2h3v4Z" /></svg><svg data-health-icon viewBox="0 0 16 16" aria-hidden="true"><path d="M8 14 1 7V3h3l2 2 2-2h3v4Z" /></svg><svg data-health-icon viewBox="0 0 16 16" aria-hidden="true"><path d="M8 14 1 7V3h3l2 2 2-2h3v4Z" /></svg>
+          <div class="stat-meter health" aria-label="血量：滿">
+            <div class="stat-track" aria-hidden="true"><div class="stat-fill health-fill"></div></div>
           </div>
         </div>
         <div class="hud-row">
           <span class="hud-label">飽食度</span>
-          <div class="meter hunger" aria-label="飽食度：滿">
-            <svg data-hunger-icon viewBox="0 0 16 16" aria-hidden="true"><path d="M2 2h5v3H5v2h5v2H8v5H5V9H2Z" /><path d="M9 2h5v5h-2v2h-2V5H9Z" /></svg><svg data-hunger-icon viewBox="0 0 16 16" aria-hidden="true"><path d="M2 2h5v3H5v2h5v2H8v5H5V9H2Z" /><path d="M9 2h5v5h-2v2h-2V5H9Z" /></svg><svg data-hunger-icon viewBox="0 0 16 16" aria-hidden="true"><path d="M2 2h5v3H5v2h5v2H8v5H5V9H2Z" /><path d="M9 2h5v5h-2v2h-2V5H9Z" /></svg><svg data-hunger-icon viewBox="0 0 16 16" aria-hidden="true"><path d="M2 2h5v3H5v2h5v2H8v5H5V9H2Z" /><path d="M9 2h5v5h-2v2h-2V5H9Z" /></svg><svg data-hunger-icon viewBox="0 0 16 16" aria-hidden="true"><path d="M2 2h5v3H5v2h5v2H8v5H5V9H2Z" /><path d="M9 2h5v5h-2v2h-2V5H9Z" /></svg>
+          <div class="stat-meter hunger" aria-label="飽食度：60%">
+            <div class="stat-track" aria-hidden="true"><div class="stat-fill hunger-fill"></div></div>
           </div>
         </div>
         <div class="hud-row">
@@ -36,7 +36,6 @@
             <div class="affection-track" aria-hidden="true">
               <div class="affection-fill"></div>
             </div>
-            <span class="affection-value">40%</span>
           </div>
         </div>
       </aside>
@@ -58,6 +57,6 @@
         </button>
       </section>
     </main>
-    <script src="app.js?v=20260802-1"></script>
+    <script src="app.js?v=20260802-4"></script>
   </body>
 </html>
