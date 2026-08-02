@@ -29,6 +29,7 @@ function createSound(path) {
 
 const hurtSound = createSound('audio/痾啊.wav');
 const landingSound = createSound('audio/落地.ogg');
+const screamSound = createSound('audio/咿.wav');
 const deathSound = createSound('audio/死亡音效.wav');
 
 const MAX_HEALTH = 5;
@@ -187,6 +188,7 @@ function unlockSound(sound) {
 function unlockGameSounds() {
   unlockSound(hurtSound);
   unlockSound(landingSound);
+  unlockSound(screamSound);
   unlockSound(deathSound);
 }
 
@@ -220,6 +222,10 @@ function playDeathSound() {
   playSound(deathSound);
 }
 
+function playScreamSound() {
+  if (!playSoundBuffer(screamSound)) playSoundFallback(screamSound);
+}
+
 function stopSound(sound) {
   sound.sources.forEach((source) => {
     try { source.stop(); } catch {}
@@ -242,16 +248,24 @@ function triggerDeath(cause = '企鵝失去了所有血量') {
   }
   pet.classList.remove('walking', 'facing-left', 'jumping', 'spinning', 'dragging', 'falling', 'hurt');
   world.classList.add('is-dying');
-  pet.classList.add('death-jumpscare');
   deathCause.textContent = cause;
-  playDeathSound();
-  window.setTimeout(() => {
+  const syncScreamWithJumpscare = (event) => {
+    if (event.animationName !== 'death-jumpscare') return;
+    pet.removeEventListener('animationstart', syncScreamWithJumpscare);
     if (!isDead) return;
-    deathScreen.classList.add('is-visible');
-    deathScreen.setAttribute('aria-hidden', 'false');
-    deathScreen.inert = false;
-    restartButton.focus();
-  }, DEATH_SCREEN_DELAY);
+    playScreamSound();
+    window.setTimeout(() => {
+      if (!isDead) return;
+      stopSound(screamSound);
+      playDeathSound();
+      deathScreen.classList.add('is-visible');
+      deathScreen.setAttribute('aria-hidden', 'false');
+      deathScreen.inert = false;
+      restartButton.focus();
+    }, DEATH_SCREEN_DELAY);
+  };
+  pet.addEventListener('animationstart', syncScreamWithJumpscare);
+  pet.classList.add('death-jumpscare');
 }
 
 function restartGame() {
@@ -262,6 +276,7 @@ function restartGame() {
   health = MAX_HEALTH;
   hunger = 3;
   position = 42;
+  stopSound(screamSound);
   stopSound(deathSound);
   world.classList.remove('is-dying');
   deathScreen.classList.remove('is-visible');
