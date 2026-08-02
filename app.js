@@ -10,6 +10,9 @@ const settingsButton = document.querySelector('#settings-button');
 const settingsMenu = document.querySelector('#settings-menu');
 const debugPanel = document.querySelector('.debug-panel');
 const featurePanel = document.querySelector('.feature-panel');
+const feedButton = document.querySelector('#feed-button');
+const feedButtonLabel = document.querySelector('#feed-button-label');
+const foodPicker = document.querySelector('#food-picker');
 let position = 42;
 let walking = false;
 let clickTimer;
@@ -25,6 +28,15 @@ let dragStartX = 0;
 let dragStartY = 0;
 let petStartLeft = 0;
 let petStartTop = 0;
+let isFeedingMode = false;
+let activeFood = null;
+let foodDragOffsetX = 0;
+let foodDragOffsetY = 0;
+let foodDragPointerId = null;
+let feedingJumpActive = false;
+let foodCollectedDuringJump = false;
+let missedFeedingJumps = 0;
+let lastFeedingJumpAt = 0;
 const AudioContextClass = window.AudioContext || window.webkitAudioContext;
 let audioContext;
 
@@ -39,6 +51,7 @@ const landingSound = createSound('audio/落地.wav');
 const screamSound = createSound('audio/咿.wav');
 const deathSound = createSound('audio/死亡音效.wav');
 const deathNoteSound = createSound('audio/死亡筆記本.wav');
+const moralSound = createSound('audio/做事要講良心.wav');
 
 const MAX_HEALTH = 100;
 const MAX_HUNGER = 10;
@@ -53,12 +66,17 @@ const HEAL_AMOUNT = 10;
 const HEAL_HUNGER_COST = 1;
 const FEED_HUNGER_GAIN = .5;
 const FEED_AFFECTION_GAIN = 3;
+const STONE_HUNGER_GAIN = 1;
+const STONE_AFFECTION_GAIN = 10;
 const AFFECTION_LOSS_PER_DAMAGE = 1;
 const DEATH_RED_FLASH_DELAY = 180;
 const DEATH_SCREEN_DELAY = 500;
 const CLOUD_TRAVEL_MS = 60_000;
 const MULTI_CLICK_DELAY = 500;
 const DEATH_NOTE_DURATION_MS = 3643;
+const FEEDING_TICK_MS = 120;
+const FEEDING_JUMP_COOLDOWN_MS = 800;
+const FEEDING_REACH_PADDING = 22;
 let debugCloudCount = null;
 
 function getMinuteCloudCount(date = new Date()) {
@@ -92,6 +110,7 @@ function updateCloudsFromClock() {
 
 function toggleSettings() {
   const isOpen = document.body.classList.toggle('settings-open');
+  if (isOpen) setFeedingMode(false);
   if (isOpen && clickTimer) {
     window.clearTimeout(clickTimer);
     clickTimer = undefined;
@@ -143,8 +162,188 @@ function renderAffection() {
   meter.setAttribute('aria-label', `好感度：${affection}%`);
 }
 
+function removeActiveFood() {
+  if (!activeFood) return;
+  activeFood.remove();
+  activeFood = null;
+  foodDragPointerId = null;
+}
+
+function setFeedingMode(enabled) {
+  if (enabled && (isSettingsOpen() || isDead || isDragging || isFalling)) return;
+  isFeedingMode = enabled;
+  document.body.classList.toggle('feeding-mode', enabled);
+  foodPicker.inert = !enabled;
+  foodPicker.setAttribute('aria-hidden', String(!enabled));
+  feedButton.setAttribute('aria-pressed', String(enabled));
+  feedButton.setAttribute('aria-label', enabled ? '結束餵食模式' : '進入餵食模式');
+  feedButtonLabel.textContent = enabled ? '結束餵食' : '餵食';
+
+  if (enabled) {
+    if (clickTimer) {
+      window.clearTimeout(clickTimer);
+      clickTimer = undefined;
+      clickCount = 0;
+    }
+    walking = false;
+    pet.classList.remove('walking');
+    unlockGameSounds();
+    return;
+  }
+
+  removeActiveFood();
+  feedingJumpActive = false;
+  foodCollectedDuringJump = false;
+  missedFeedingJumps = 0;
+  pet.classList.remove('feeding-chasing', 'feeding-running-away', 'walking');
+  stopSound(moralSound);
+}
+
+function moveFoodWithPointer(event) {
+  if (!activeFood || foodDragPointerId !== event.pointerId) return;
+  const maxLeft = window.innerWidth - activeFood.offsetWidth;
+  const maxTop = grass.getBoundingClientRect().top - activeFood.offsetHeight;
+  activeFood.style.left = `${Math.max(0, Math.min(maxLeft, event.clientX - foodDragOffsetX))}px`;
+  activeFood.style.top = `${Math.max(0, Math.min(maxTop, event.clientY - foodDragOffsetY))}px`;
+}
+
+function releaseFoodPointer(event) {
+  if (foodDragPointerId !== event.pointerId) return;
+  if (activeFood) activeFood.classList.remove('dragging');
+  foodDragPointerId = null;
+}
+
+function spawnFoodFromPicker(type, event) {
+  if (!isFeedingMode || isSettingsOpen() || isDead) return;
+  event.preventDefault();
+  removeActiveFood();
+  missedFeedingJumps = 0;
+  const item = document.createElement('button');
+  item.type = 'button';
+  item.className = `feeding-item feeding-item-${type}`;
+  item.dataset.foodType = type;
+  item.setAttribute('aria-label', type === 'apple' ? '可拖曳的蘋果' : '可拖曳的最愛稀有石頭');
+  const art = document.createElement('span');
+  art.className = `food-art food-art-${type}`;
+  art.setAttribute('aria-hidden', 'true');
+  item.append(art);
+  world.append(item);
+  activeFood = item;
+  foodDragPointerId = event.pointerId;
+  foodDragOffsetX = item.offsetWidth / 2;
+  foodDragOffsetY = item.offsetHeight / 2;
+  item.classList.add('dragging');
+  moveFoodWithPointer(event);
+  item.addEventListener('pointerdown', (event) => {
+    if (!isFeedingMode || isSettingsOpen()) return;
+    event.preventDefault();
+    unlockGameSounds();
+    const rect = item.getBoundingClientRect();
+    foodDragOffsetX = event.clientX - rect.left;
+    foodDragOffsetY = event.clientY - rect.top;
+    foodDragPointerId = event.pointerId;
+    item.classList.add('dragging');
+  });
+}
+
+document.addEventListener('pointermove', moveFoodWithPointer);
+document.addEventListener('pointerup', releaseFoodPointer);
+document.addEventListener('pointercancel', releaseFoodPointer);
+
+function collectFood() {
+  if (!activeFood) return false;
+  const isStone = activeFood.dataset.foodType === 'stone';
+  foodCollectedDuringJump = feedingJumpActive;
+  hunger = Math.min(MAX_HUNGER, hunger + (isStone ? STONE_HUNGER_GAIN : FEED_HUNGER_GAIN));
+  affection = Math.min(MAX_AFFECTION, affection + (isStone ? STONE_AFFECTION_GAIN : FEED_AFFECTION_GAIN));
+  renderHunger();
+  renderAffection();
+  removeActiveFood();
+  missedFeedingJumps = 0;
+  pet.classList.remove('feeding-chasing', 'feeding-running-away', 'walking');
+  return true;
+}
+
+function tryCollectFood() {
+  if (!activeFood || hunger >= MAX_HUNGER) return false;
+  const foodRect = activeFood.getBoundingClientRect();
+  const petRect = pet.getBoundingClientRect();
+  const foodX = foodRect.left + foodRect.width / 2;
+  const foodY = foodRect.top + foodRect.height / 2;
+  const withinHorizontalReach = foodX >= petRect.left - FEEDING_REACH_PADDING && foodX <= petRect.right + FEEDING_REACH_PADDING;
+  const withinVerticalReach = foodY >= petRect.top - FEEDING_REACH_PADDING && foodY <= petRect.bottom - 12;
+  return withinHorizontalReach && withinVerticalReach ? collectFood() : false;
+}
+
+function startFeedingJump() {
+  const now = Date.now();
+  if (feedingJumpActive || now - lastFeedingJumpAt < FEEDING_JUMP_COOLDOWN_MS) return;
+  lastFeedingJumpAt = now;
+  feedingJumpActive = true;
+  foodCollectedDuringJump = false;
+  jump();
+  window.setTimeout(tryCollectFood, 300);
+  window.setTimeout(() => {
+    feedingJumpActive = false;
+    if (!isFeedingMode || !activeFood || foodCollectedDuringJump) return;
+    missedFeedingJumps += 1;
+    if (missedFeedingJumps < 3) return;
+    missedFeedingJumps = 0;
+    playSound(moralSound);
+  }, 640);
+}
+
+function runAwayFromFood() {
+  if (!activeFood) return;
+  const foodRect = activeFood.getBoundingClientRect();
+  const petRect = pet.getBoundingClientRect();
+  const foodIsLeft = foodRect.left + foodRect.width / 2 < petRect.left + petRect.width / 2;
+  const targetLeft = foodIsLeft ? window.innerWidth - pet.offsetWidth - 8 : 8;
+  pet.classList.remove('feeding-chasing');
+  pet.classList.add('feeding-running-away', 'walking');
+  pet.classList.toggle('facing-left', targetLeft < petRect.left);
+  pet.style.left = `${targetLeft}px`;
+  position = (targetLeft / window.innerWidth) * 100;
+}
+
+function updateFeedingBehavior() {
+  if (!isFeedingMode || isSettingsOpen() || isDead || !activeFood) return;
+  if (hunger >= MAX_HUNGER) {
+    runAwayFromFood();
+    return;
+  }
+
+  pet.classList.remove('feeding-running-away');
+  if (feedingJumpActive) {
+    tryCollectFood();
+    return;
+  }
+  if (tryCollectFood()) return;
+
+  const foodRect = activeFood.getBoundingClientRect();
+  const petRect = pet.getBoundingClientRect();
+  const foodX = foodRect.left + foodRect.width / 2;
+  const petX = petRect.left + petRect.width / 2;
+  const horizontalDistance = foodX - petX;
+  const horizontalReach = petRect.width * .22;
+
+  if (Math.abs(horizontalDistance) > horizontalReach) {
+    const targetLeft = Math.max(0, Math.min(window.innerWidth - pet.offsetWidth, foodX - pet.offsetWidth / 2));
+    pet.classList.add('feeding-chasing', 'walking');
+    pet.classList.toggle('facing-left', horizontalDistance < 0);
+    pet.style.left = `${targetLeft}px`;
+    position = (targetLeft / window.innerWidth) * 100;
+    return;
+  }
+
+  pet.classList.remove('walking');
+  const foodY = foodRect.top + foodRect.height / 2;
+  const standingReachY = petRect.top + petRect.height * .42;
+  if (foodY < standingReachY) startFeedingJump();
+}
+
 function movePenguin() {
-  if (isSettingsOpen() || isDead || isDragging || isFalling || pet.classList.contains('jumping') || pet.classList.contains('crazy-flying')) return;
+  if (isFeedingMode || isSettingsOpen() || isDead || isDragging || isFalling || pet.classList.contains('jumping') || pet.classList.contains('crazy-flying')) return;
   const maxPosition = Math.max(8, ((window.innerWidth - pet.offsetWidth) / window.innerWidth) * 100);
   const next = Math.round(4 + Math.random() * Math.max(0, maxPosition - 8));
   pet.classList.toggle('facing-left', next < position);
@@ -201,7 +400,7 @@ function crazyFly() {
 }
 
 pet.addEventListener('click', (event) => {
-  if (isSettingsOpen() || isDead) return;
+  if (isFeedingMode || isSettingsOpen() || isDead) return;
   if (suppressNextClick) {
     suppressNextClick = false;
     return;
@@ -284,6 +483,7 @@ function unlockGameSounds() {
   unlockSound(screamSound);
   unlockSound(deathSound);
   unlockSound(deathNoteSound);
+  unlockSound(moralSound);
 }
 
 function playSoundFallback(sound) {
@@ -332,6 +532,7 @@ function stopSound(sound) {
 function triggerDeath(cause = '企鵝失去了所有血量') {
   if (isDead) return;
   isDead = true;
+  setFeedingMode(false);
   isDragging = false;
   isFalling = false;
   walking = false;
@@ -366,6 +567,7 @@ function triggerDeath(cause = '企鵝失去了所有血量') {
 }
 
 function restartGame() {
+  setFeedingMode(false);
   isDead = false;
   isDragging = false;
   isFalling = false;
@@ -377,6 +579,7 @@ function restartGame() {
   stopSound(screamSound);
   stopSound(deathSound);
   stopSound(deathNoteSound);
+  stopSound(moralSound);
   world.classList.remove('is-dying');
   deathScreen.classList.remove('is-visible');
   deathScreen.setAttribute('aria-hidden', 'true');
@@ -443,7 +646,7 @@ function fallWithGravity(startTop, targetTop, fallDistance) {
 }
 
 function healFromFullHunger() {
-  if (isSettingsOpen() || isDead || hunger < MAX_HUNGER || health >= MAX_HEALTH) return;
+  if (isFeedingMode || isSettingsOpen() || isDead || hunger < MAX_HUNGER || health >= MAX_HEALTH) return;
   health = Math.min(MAX_HEALTH, health + HEAL_AMOUNT);
   hunger = Math.max(0, hunger - HEAL_HUNGER_COST);
   renderHealth();
@@ -451,7 +654,7 @@ function healFromFullHunger() {
 }
 
 pet.addEventListener('pointerdown', (event) => {
-  if (isSettingsOpen() || isDead || isFalling || pet.classList.contains('jumping') || pet.classList.contains('spinning') || pet.classList.contains('crazy-flying')) return;
+  if (isFeedingMode || isSettingsOpen() || isDead || isFalling || pet.classList.contains('jumping') || pet.classList.contains('spinning') || pet.classList.contains('crazy-flying')) return;
   unlockGameSounds();
   const rect = pet.getBoundingClientRect();
   dragStartX = event.clientX;
@@ -508,19 +711,18 @@ updateCloudsFromClock();
 window.setInterval(updateDayNightFromBrowserTime, 60_000);
 window.setInterval(updateCloudsFromClock, CLOUD_TRAVEL_MS);
 window.setInterval(healFromFullHunger, FULL_HUNGER_HEAL_INTERVAL);
+window.setInterval(updateFeedingBehavior, FEEDING_TICK_MS);
 scheduleWalk();
 
 // Game feature controls.
-(() => {
-  const feedButton = document.querySelector('#feed-button');
-  feedButton.addEventListener('click', () => {
-    if (isSettingsOpen() || isDead) return;
-    hunger = Math.min(MAX_HUNGER, hunger + FEED_HUNGER_GAIN);
-    affection = Math.min(MAX_AFFECTION, affection + FEED_AFFECTION_GAIN);
-    renderHunger();
-    renderAffection();
-  });
-})();
+feedButton.addEventListener('click', () => {
+  if (isSettingsOpen() || isDead) return;
+  setFeedingMode(!isFeedingMode);
+});
+
+foodPicker.querySelectorAll('[data-food-type]').forEach((button) => {
+  button.addEventListener('pointerdown', (event) => spawnFoodFromPicker(button.dataset.foodType, event));
+});
 
 // ===== DEBUG ONLY — isolated visual-preview control; not part of game behaviour. =====
 (() => {
