@@ -14,6 +14,8 @@ let dragStartY = 0;
 let petStartLeft = 0;
 let petStartTop = 0;
 const hurtSound = new Audio('痾啊.wav');
+hurtSound.preload = 'auto';
+let hurtSoundUnlocked = false;
 
 const MAX_HEALTH = 5;
 const MAX_HUNGER = 5;
@@ -111,13 +113,33 @@ function landingTop() {
   return grass.getBoundingClientRect().top - pet.offsetHeight + 8;
 }
 
+function unlockHurtSound() {
+  if (hurtSoundUnlocked) return;
+  hurtSound.muted = true;
+  hurtSound.play()
+    .then(() => {
+      hurtSound.pause();
+      hurtSound.currentTime = 0;
+      hurtSound.muted = false;
+      hurtSoundUnlocked = true;
+    })
+    .catch(() => {
+      hurtSound.muted = false;
+    });
+}
+
+function playHurtSound() {
+  hurtSound.muted = false;
+  hurtSound.currentTime = 0;
+  hurtSound.play().catch(() => {});
+}
+
 function showHurtEffect(damage) {
   health = Math.max(0, health - damage);
   affection = Math.max(0, affection - (damage >= 2 ? HEAVY_FALL_AFFECTION_LOSS : LIGHT_FALL_AFFECTION_LOSS));
   renderHealth();
   renderAffection();
-  hurtSound.currentTime = 0;
-  hurtSound.play().catch(() => {});
+  playHurtSound();
   pet.classList.remove('hurt');
   void pet.offsetWidth;
   pet.classList.add('hurt');
@@ -132,6 +154,7 @@ function healFromFullHunger() {
 
 pet.addEventListener('pointerdown', (event) => {
   if (isFalling || pet.classList.contains('jumping') || pet.classList.contains('spinning')) return;
+  unlockHurtSound();
   const rect = pet.getBoundingClientRect();
   dragStartX = event.clientX;
   dragStartY = event.clientY;
@@ -210,12 +233,23 @@ scheduleWalk();
 // ===== DEBUG ONLY — isolated visual-preview control; not part of game behaviour. =====
 (() => {
   const debugButton = document.querySelector('#debug-day-night');
+  const debugHurtButton = document.querySelector('#debug-hurt');
+  const debugFullHungerButton = document.querySelector('#debug-full-hunger');
   let previewNight = document.body.classList.contains('is-night');
   debugButton.addEventListener('click', () => {
     previewNight = !previewNight;
     document.body.classList.toggle('debug-force-night', previewNight);
     document.body.classList.toggle('debug-force-day', !previewNight);
     debugButton.textContent = previewNight ? '切換至白天預覽' : '切換至夜晚預覽';
+  });
+  debugHurtButton.addEventListener('click', () => {
+    unlockHurtSound();
+    showHurtEffect(1);
+  });
+  debugFullHungerButton.addEventListener('click', () => {
+    hunger = MAX_HUNGER;
+    renderHunger();
+    healFromFullHunger();
   });
 })();
 
