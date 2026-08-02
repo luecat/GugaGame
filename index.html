@@ -7,7 +7,7 @@
     <meta name="supported-color-schemes" content="light" />
     <meta name="theme-color" content="#80d2ef" />
     <title>企鵝</title>
-    <link rel="stylesheet" href="style.css?v=20260802-3" />
+    <link rel="stylesheet" href="style.css?v=20260802-6" />
   </head>
   <body>
     <main class="world" aria-label="企鵝的草地">
@@ -49,6 +49,7 @@
         <button id="debug-day-night" type="button">切換晝夜預覽</button>
         <button id="debug-hurt" type="button">扣血測試</button>
         <button id="debug-full-hunger" type="button">飽食滿格</button>
+        <button id="debug-death" type="button">死亡測試</button>
       </section>
       <section class="feature-panel" aria-label="功能專區">
         <button id="feed-button" type="button" aria-label="餵食企鵝">
@@ -56,7 +57,14 @@
           餵食
         </button>
       </section>
+      <section id="death-screen" class="death-screen" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="death-title" inert>
+        <div class="death-content">
+          <h1 id="death-title">你死了！</h1>
+          <p id="death-cause">企鵝從太高的地方摔了下來</p>
+          <button id="restart-button" type="button">重新開始</button>
+        </div>
+      </section>
     </main>
-    <script src="app.js?v=20260802-5"></script>
+    <script src="app.js?v=20260802-8"></script>
   </body>
 </html>
