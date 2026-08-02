@@ -71,7 +71,7 @@ body.feeding-mode #feed-button { background: #b45b5b; }
 .feeding-item .food-art-stone { transform: scale(1.45) rotate(-5deg); }
 .feeding-item.dragging { cursor: grabbing; transform: scale(1.08); }
 .feeding-item.falling { pointer-events: auto; }
-.feeding-item.landed { transform: scale(.96); }
+.feeding-item.landed { pointer-events: none; animation: food-fade-out .5s ease-out .3s both; }
 body.is-night { background: #17284d; } body.is-night .sky { background: #263f76; } body.is-night .sun { opacity: 0; transform: translateY(15px); } body.is-night .moon { opacity: 1; transform: translateY(0); } body.is-night .cloud { fill: #aeb8d4; opacity: .25; } body.is-night .grass { background: #376e41; border-top-color: #528b57; }
 /* DEBUG ONLY: preview classes always win over the browser-clock state. */
 body.debug-force-night { background: #17284d; } body.debug-force-night .sky { background: #263f76; } body.debug-force-night .sun { opacity: 0; transform: translateY(15px); } body.debug-force-night .moon { opacity: 1; transform: translateY(0); } body.debug-force-night .cloud { fill: #aeb8d4; opacity: .35; } body.debug-force-night .grass { background: #376e41; border-top-color: #528b57; }
@@ -91,6 +91,7 @@ body.debug-force-day { background: #8ed7f4; } body.debug-force-day .sky { backgr
 @keyframes death-jumpscare { 0% { transform: translate(-50%, -50%) scale(.08) rotate(0); } 18% { transform: translate(-54%, -46%) scale(.48) rotate(-4deg); } 42% { transform: translate(-47%, -53%) scale(1.18) rotate(4deg); } 62% { transform: translate(-52%, -48%) scale(.98) rotate(-3deg); } 82% { transform: translate(-48%, -52%) scale(1.08) rotate(2deg); } 100% { transform: translate(-50%, -50%) scale(1.04) rotate(0); } }
 @keyframes death-flash { from { opacity: 0; } to { opacity: 1; } }
 @keyframes cloud-cross { from { transform: translateX(calc(-100% - 24px)); } to { transform: translateX(calc(100vw + 24px)); } }
+@keyframes food-fade-out { from { opacity: 1; transform: scale(.96); } to { opacity: 0; transform: scale(.72); } }
 @media (max-width: 600px) {
   .settings-button { top: max(10px, env(safe-area-inset-top)); left: 10px; }
   .settings-menu { top: calc(max(10px, env(safe-area-inset-top)) + 56px); left: 10px; width: calc(100vw - 20px); height: min(52vh, 420px); }

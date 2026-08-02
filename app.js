@@ -45,6 +45,9 @@ let lastFeedingJumpAt = 0;
 const AudioContextClass = window.AudioContext || window.webkitAudioContext;
 let audioContext;
 let audioContextPrimed = false;
+let gameAudioActivated = false;
+let genshinSoundPending = false;
+let previousCloudCount = null;
 
 function createSound(path) {
   const element = new Audio(path);
@@ -58,6 +61,7 @@ const screamSound = createSound('audio/咿.wav');
 const deathSound = createSound('audio/死亡音效.wav');
 const deathNoteSound = createSound('audio/死亡筆記本.wav');
 const moralSound = createSound('audio/做事要講良心.wav');
+const genshinSound = createSound('audio/好想玩原神.wav');
 
 const MAX_HEALTH = 100;
 const MAX_HUNGER = 10;
@@ -86,7 +90,8 @@ const FEEDING_REACH_PADDING = 22;
 const FOOD_DRAG_START_DISTANCE = 7;
 const FOOD_EAT_DELAY_MS = 1000;
 const FOOD_FALL_GRAVITY = 1600;
-const FOOD_GROUND_LIFETIME_MS = 500;
+const FOOD_GROUND_FADE_DELAY_MS = 300;
+const FOOD_GROUND_FADE_DURATION_MS = 500;
 const USE_IOS_TOUCH_DRAG = /iPad|iPhone|iPod/.test(navigator.userAgent)
   || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 let debugCloudCount = null;
@@ -112,12 +117,28 @@ function renderClouds(count) {
     cloud.style.animationDelay = `${-phase * CLOUD_TRAVEL_MS}ms`;
     cloudLayer.append(cloud);
   }
+
+  if (count === 9 && previousCloudCount !== 9) {
+    if (gameAudioActivated) playSound(genshinSound);
+    else genshinSoundPending = true;
+  } else if (count !== 9) {
+    genshinSoundPending = false;
+  }
+  previousCloudCount = count;
 }
 
 function updateCloudsFromClock() {
   const now = new Date();
   const count = debugCloudCount ?? getMinuteCloudCount(now);
   renderClouds(count);
+}
+
+function scheduleNextCloudUpdate() {
+  const delay = CLOUD_TRAVEL_MS - (Date.now() % CLOUD_TRAVEL_MS);
+  window.setTimeout(() => {
+    updateCloudsFromClock();
+    scheduleNextCloudUpdate();
+  }, delay);
 }
 
 function toggleSettings() {
@@ -202,7 +223,7 @@ function landFood(food) {
   food.classList.add('landed');
   foodGroundTimer = window.setTimeout(() => {
     if (activeFood === food && foodDragPointerId === null) removeActiveFood();
-  }, FOOD_GROUND_LIFETIME_MS);
+  }, FOOD_GROUND_FADE_DELAY_MS + FOOD_GROUND_FADE_DURATION_MS);
 }
 
 function startFoodFall() {
@@ -681,12 +702,18 @@ function unlockSound(sound) {
 }
 
 function unlockGameSounds() {
+  gameAudioActivated = true;
   unlockSound(hurtSound);
   unlockSound(landingSound);
   unlockSound(screamSound);
   unlockSound(deathSound);
   unlockSound(deathNoteSound);
   unlockSound(moralSound);
+  unlockSound(genshinSound);
+  if (genshinSoundPending) {
+    genshinSoundPending = false;
+    window.setTimeout(() => playSound(genshinSound), 0);
+  }
 }
 
 document.addEventListener('pointerdown', unlockGameSounds, { capture: true });
@@ -915,7 +942,7 @@ window.addEventListener('resize', () => {
 updateDayNightFromBrowserTime();
 updateCloudsFromClock();
 window.setInterval(updateDayNightFromBrowserTime, 60_000);
-window.setInterval(updateCloudsFromClock, CLOUD_TRAVEL_MS);
+scheduleNextCloudUpdate();
 window.setInterval(healFromFullHunger, FULL_HUNGER_HEAL_INTERVAL);
 window.setInterval(updateFeedingBehavior, FEEDING_TICK_MS);
 scheduleWalk();
