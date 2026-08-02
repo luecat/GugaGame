@@ -10,7 +10,10 @@ body { margin: 0; overflow: hidden; overscroll-behavior: none; background: #8ed7
 .hud { position: absolute; z-index: 3; top: 24px; right: 24px; width: 164px; height: 164px; padding: 16px; display: grid; align-content: center; justify-items: center; gap: 12px; border: 0; border-radius: 18px; background: #ffffffb8; }
 .hud-row { display: grid; width: max-content; justify-items: start; gap: 2px; } .hud-label { color: #36576a; font-size: 12px; font-weight: 800; letter-spacing: .04em; } .meter { display: flex; gap: 9px; } .meter svg { width: 18px; height: 18px; filter: drop-shadow(0 1px 0 #6f453733); } .health svg { fill: #ef5c65; } .health svg.is-empty { opacity: .18; } .hunger svg { fill: #bd7446; } .hunger svg path:last-child { fill: #f0b362; }
 .hunger svg.is-empty { opacity: .18; }
-.affection svg { fill: #f2bd4a; } .affection svg.is-empty { opacity: .18; }
+.affection { display: flex; align-items: center; gap: 7px; width: 104px; color: #36576a; font-size: 11px; font-weight: 800; }
+.affection-track { width: 64px; height: 8px; border-radius: 99px; background: #d9d4cd; overflow: hidden; }
+.affection-fill { width: 40%; height: 100%; border-radius: inherit; background: #f2bd4a; transition: width .22s ease; }
+.affection-value { min-width: 28px; text-align: right; }
 .grass { position: absolute; inset: 72% 0 0; background: #5bad4a; border-top: 8px solid #93d878; transition: background .8s ease, border-color .8s ease; }
 .grass::before { content: ""; position: absolute; inset: -13px 0 auto; height: 15px; background: repeating-linear-gradient(110deg, transparent 0 10px, #5aad4c 11px 13px, transparent 14px 22px); }
 .pet { position: absolute; left: 42%; bottom: 19%; width: clamp(130px, 18vw, 205px); padding: 0; border: 0; outline: 0; background: transparent; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; transition: left 1.1s ease-in-out; }
@@ -43,6 +46,8 @@ body.debug-force-day { background: #8ed7f4; } body.debug-force-day .sky { backgr
   .hud-label { font-size: 11px; }
   .meter { gap: 4px; }
   .meter svg { width: 16px; height: 16px; }
+  .affection { width: 92px; gap: 5px; font-size: 10px; }
+  .affection-track { width: 56px; height: 7px; }
   .debug-panel, .feature-panel { bottom: max(10px, env(safe-area-inset-bottom)); padding: 9px; }
   .debug-panel { left: 10px; }
   .feature-panel { right: 10px; }

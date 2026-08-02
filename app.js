@@ -5,7 +5,7 @@ let walking = false;
 let clickTimer;
 let health = 5;
 let hunger = 3;
-let affection = 2;
+let affection = 40;
 let isDragging = false;
 let isFalling = false;
 let suppressNextClick = false;
@@ -13,13 +13,17 @@ let dragStartX = 0;
 let dragStartY = 0;
 let petStartLeft = 0;
 let petStartTop = 0;
+const hurtSound = new Audio('痾啊.wav');
 
 const MAX_HEALTH = 5;
 const MAX_HUNGER = 5;
-const MAX_AFFECTION = 5;
+const MAX_AFFECTION = 100;
 const FALL_DAMAGE_HEIGHT = 120;
 const HEAVY_FALL_HEIGHT = 260;
 const FULL_HUNGER_HEAL_INTERVAL = 3000;
+const FEED_AFFECTION_GAIN = 12;
+const LIGHT_FALL_AFFECTION_LOSS = 10;
+const HEAVY_FALL_AFFECTION_LOSS = 22;
 
 // Production feature: derive the scene from the browser's local time.
 function updateDayNightFromBrowserTime() {
@@ -44,9 +48,12 @@ function renderHealth() {
 }
 
 function renderAffection() {
-  document.querySelectorAll('[data-affection-icon]').forEach((icon, index) => {
-    icon.classList.toggle('is-empty', index >= affection);
-  });
+  const meter = document.querySelector('.affection');
+  const fill = document.querySelector('.affection-fill');
+  const value = document.querySelector('.affection-value');
+  fill.style.width = `${affection}%`;
+  value.textContent = `${affection}%`;
+  meter.setAttribute('aria-label', `好感度：${affection}%`);
 }
 
 function movePenguin() {
@@ -106,7 +113,11 @@ function landingTop() {
 
 function showHurtEffect(damage) {
   health = Math.max(0, health - damage);
+  affection = Math.max(0, affection - (damage >= 2 ? HEAVY_FALL_AFFECTION_LOSS : LIGHT_FALL_AFFECTION_LOSS));
   renderHealth();
+  renderAffection();
+  hurtSound.currentTime = 0;
+  hurtSound.play().catch(() => {});
   pet.classList.remove('hurt');
   void pet.offsetWidth;
   pet.classList.add('hurt');
@@ -190,7 +201,7 @@ scheduleWalk();
   const feedButton = document.querySelector('#feed-button');
   feedButton.addEventListener('click', () => {
     hunger = Math.min(MAX_HUNGER, hunger + 1);
-    affection = Math.min(MAX_AFFECTION, affection + 1);
+    affection = Math.min(MAX_AFFECTION, affection + FEED_AFFECTION_GAIN);
     renderHunger();
     renderAffection();
   });
