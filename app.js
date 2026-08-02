@@ -16,6 +16,10 @@ let petStartTop = 0;
 const hurtSound = new Audio('痾啊.wav');
 hurtSound.preload = 'auto';
 let hurtSoundUnlocked = false;
+const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+let audioContext;
+let hurtSoundBuffer;
+let hurtSoundBufferPromise;
 
 const MAX_HEALTH = 5;
 const MAX_HUNGER = 5;
@@ -113,7 +117,40 @@ function landingTop() {
   return grass.getBoundingClientRect().top - pet.offsetHeight + 8;
 }
 
+function loadHurtSoundBuffer() {
+  if (!AudioContextClass) return Promise.resolve(null);
+  if (!audioContext) audioContext = new AudioContextClass();
+  if (!hurtSoundBufferPromise) {
+    hurtSoundBufferPromise = fetch(hurtSound.src, { cache: 'force-cache' })
+      .then((response) => {
+        if (!response.ok) throw new Error(`Audio request failed: ${response.status}`);
+        return response.arrayBuffer();
+      })
+      .then((audioData) => audioContext.decodeAudioData(audioData))
+      .then((buffer) => {
+        hurtSoundBuffer = buffer;
+        return buffer;
+      })
+      .catch(() => null);
+  }
+  return hurtSoundBufferPromise;
+}
+
+function playHurtSoundBuffer() {
+  if (!audioContext || !hurtSoundBuffer) return false;
+  const source = audioContext.createBufferSource();
+  source.buffer = hurtSoundBuffer;
+  source.connect(audioContext.destination);
+  source.start();
+  return true;
+}
+
 function unlockHurtSound() {
+  if (AudioContextClass) {
+    if (!audioContext) audioContext = new AudioContextClass();
+    audioContext.resume().catch(() => {});
+    loadHurtSoundBuffer();
+  }
   if (hurtSoundUnlocked) return;
   hurtSound.muted = true;
   hurtSound.play()
@@ -128,10 +165,22 @@ function unlockHurtSound() {
     });
 }
 
-function playHurtSound() {
+function playHurtSoundFallback() {
   hurtSound.muted = false;
   hurtSound.currentTime = 0;
   hurtSound.play().catch(() => {});
+}
+
+function playHurtSound() {
+  if (playHurtSoundBuffer()) return;
+  if (AudioContextClass) {
+    loadHurtSoundBuffer().then((buffer) => {
+      if (buffer) playHurtSoundBuffer();
+      else playHurtSoundFallback();
+    });
+    return;
+  }
+  playHurtSoundFallback();
 }
 
 function showHurtEffect(damage) {
