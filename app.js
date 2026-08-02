@@ -22,8 +22,8 @@ function createSound(path) {
   return { element, buffer: null, bufferPromise: null, unlocked: false };
 }
 
-const hurtSound = createSound('痾啊.wav');
-const landingSound = createSound('落地.ogg');
+const hurtSound = createSound('audio/痾啊.wav');
+const landingSound = createSound('audio/落地.ogg');
 
 const MAX_HEALTH = 5;
 const MAX_HUNGER = 5;
