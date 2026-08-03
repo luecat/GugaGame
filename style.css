@@ -8,6 +8,16 @@ body { margin: 0; overflow: hidden; overscroll-behavior: none; background: #8ed7
 .settings-button:focus-visible { outline: 3px solid #38515b; outline-offset: 3px; }
 .settings-button svg { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform .35s ease; }
 .settings-menu { position: absolute; z-index: 11; top: 76px; left: 18px; width: min(380px, calc(100vw - 36px)); height: min(55vh, 460px); padding: 16px; overflow-y: auto; visibility: hidden; opacity: 0; border: 1px solid #ffffff8c; border-radius: 18px; background: #ffffff80; box-shadow: 0 16px 40px #38515b2b; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); transition: opacity .25s ease, visibility 0s linear .25s; }
+.volume-setting { display: grid; width: 100%; gap: 8px; margin-bottom: 18px; padding-bottom: 17px; border-bottom: 1px solid #38515b2b; color: #38515b; }
+.volume-setting label { font-size: 13px; font-weight: 800; letter-spacing: .03em; }
+.volume-control { display: flex; align-items: center; width: 100%; gap: 13px; }
+.volume-control input[type="range"] { flex: 1 1 auto; min-width: 0; height: 28px; margin: 0; accent-color: #38515b; cursor: pointer; }
+.volume-control input[type="range"]:focus-visible { outline: 3px solid #38515b; outline-offset: 3px; border-radius: 99px; }
+.volume-icon { flex: 0 0 25px; width: 25px; height: 25px; fill: #38515b; stroke: #38515b; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.volume-icon .volume-wave, .volume-icon .volume-muted-mark { fill: none; }
+.volume-icon .volume-muted-mark { display: none; }
+.volume-control.is-muted .volume-wave { display: none; }
+.volume-control.is-muted .volume-muted-mark { display: block; }
 body.settings-open .settings-button svg { transform: rotate(90deg); }
 body.settings-open .settings-menu { visibility: visible; opacity: 1; transition-delay: 0s; }
 body.settings-open .hud, body.settings-open .feature-panel { visibility: hidden; opacity: 0; pointer-events: none; }
@@ -60,12 +70,17 @@ body.feeding-mode .pet { pointer-events: none; }
 .debug-panel button, .feature-panel button { padding: 7px 9px; border: 0; border-radius: 6px; background: #38515b; color: white; cursor: pointer; font: inherit; }
 .feature-panel button { display: flex; align-items: center; justify-content: center; gap: 5px; } .feature-panel button svg { width: 15px; height: 15px; fill: #ef6f71; stroke: #ef6f71; stroke-width: 1.5; }
 .feature-actions { display: grid; grid-template-columns: repeat(2, minmax(72px, 1fr)); gap: 7px; }
-.food-picker { display: none; grid-template-columns: repeat(2, minmax(72px, 1fr)); gap: 7px; }
+.food-picker, .interaction-picker { display: none; grid-template-columns: repeat(2, minmax(72px, 1fr)); gap: 7px; }
 body.feeding-mode .food-picker { display: grid; }
 body.feeding-mode #feed-button { background: #b45b5b; }
 body.feeding-mode .settings-button { visibility: hidden; opacity: 0; pointer-events: none; }
 body.feeding-mode .feature-actions { grid-template-columns: 1fr; }
 body.feeding-mode #interact-button { display: none; }
+.interaction-picker button { min-height: 68px; background: #52747f; }
+body.interaction-mode .interaction-picker { display: grid; }
+body.interaction-mode .feature-actions { grid-template-columns: 1fr; }
+body.interaction-mode #feed-button { display: none; }
+body.interaction-mode #interact-button { background: #b45b5b; }
 .food-picker button { flex-direction: column; min-height: 68px; background: #52747f; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .food-art { position: relative; display: block; flex: 0 0 auto; width: 30px; height: 28px; }
 .food-art-apple { width: 29px; height: 25px; margin-top: 3px; border-radius: 46% 46% 52% 52% / 42% 42% 60% 60%; background: linear-gradient(135deg, #ff7870 0 34%, #dc3e45 72%); box-shadow: inset -4px -3px 0 #a9263038, inset 3px 2px 0 #ffffff40; }
@@ -117,7 +132,7 @@ body.debug-force-day { background: #8ed7f4; } body.debug-force-day .sky { backgr
   .feature-panel { right: 10px; }
   .debug-panel button, .feature-panel button { min-height: 40px; padding: 8px 10px; }
   .feature-actions { grid-template-columns: repeat(2, minmax(64px, 1fr)); }
-  .food-picker { grid-template-columns: repeat(2, minmax(64px, 1fr)); }
+  .food-picker, .interaction-picker { grid-template-columns: repeat(2, minmax(64px, 1fr)); }
   .feeding-item { width: 52px; height: 52px; }
 }
 
