@@ -175,6 +175,20 @@ function isSettingsOpen() {
   return document.body.classList.contains('settings-open');
 }
 
+function canPlayGenshinSound() {
+  return walking && !isSettingsOpen() && !isFeedingMode && !isSingingMode && !isDead && !isDragging && !isFalling;
+}
+
+function maybePlayGenshinSound(count) {
+  if (count !== 9 || genshinSoundPlayed || genshinSoundPending || !canPlayGenshinSound()) return;
+  if (gameAudioActivated) {
+    genshinSoundPlayed = true;
+    playGenshinSoundWithCloudLock(count);
+  } else {
+    genshinSoundPending = true;
+  }
+}
+
 function renderClouds(count) {
   if (lockedCloudCount !== null && count !== lockedCloudCount) return;
   cloudLayer.replaceChildren();
@@ -190,14 +204,9 @@ function renderClouds(count) {
     cloudLayer.append(cloud);
   }
 
-  if (count === 9 && !genshinSoundPlayed && !genshinSoundPending) {
-    if (gameAudioActivated) {
-      genshinSoundPlayed = true;
-      playGenshinSoundWithCloudLock(count);
-    } else {
-      genshinSoundPending = true;
-    }
-  } else if (count !== 9) {
+  if (count === 9) {
+    maybePlayGenshinSound(count);
+  } else {
     genshinSoundPending = false;
   }
 }
@@ -494,7 +503,7 @@ function setSingingMode(enabled) {
   document.body.classList.toggle('singing-mode', enabled);
   singingPicker.inert = !enabled;
   singingPicker.setAttribute('aria-hidden', String(!enabled));
-  petImage.src = enabled ? 'assets/gugugaga-sing.png' : normalPetImageSource;
+  petImage.src = enabled ? 'assets/gugugaga-sing.png?v=20260803-12' : normalPetImageSource;
   petImage.alt = enabled ? '唱歌中的企鵝' : '企鵝';
   if (!enabled) {
     stopSound(singingSound);
@@ -816,6 +825,7 @@ function movePenguin() {
   walking = true;
   pet.classList.add('walking');
   pet.style.left = `${position}%`;
+  maybePlayGenshinSound(debugCloudCount ?? getMinuteCloudCount());
   window.setTimeout(() => { walking = false; pet.classList.remove('walking'); }, 1250);
 }
 
@@ -988,10 +998,12 @@ function unlockGameSounds() {
   unlockSound(moralSound);
   unlockSound(genshinSound);
   unlockSound(singingSound);
-  if (genshinSoundPending) {
+  if (genshinSoundPending && canPlayGenshinSound()) {
     genshinSoundPending = false;
     genshinSoundPlayed = true;
     window.setTimeout(() => playGenshinSoundWithCloudLock(), 0);
+  } else if (genshinSoundPending) {
+    genshinSoundPending = false;
   }
 }
 
