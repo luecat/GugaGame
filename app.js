@@ -1,4 +1,5 @@
 const pet = document.querySelector('#pet');
+const petImage = pet.querySelector('img');
 const grass = document.querySelector('.grass');
 const world = document.querySelector('.world');
 const deathScreen = document.querySelector('#death-screen');
@@ -17,6 +18,10 @@ const foodPicker = document.querySelector('#food-picker');
 const interactButton = document.querySelector('#interact-button');
 const interactButtonLabel = document.querySelector('#interact-button-label');
 const interactionPicker = document.querySelector('#interaction-picker');
+const singingButton = document.querySelector('#singing-button');
+const singingPicker = document.querySelector('#singing-picker');
+const cancelSingingButton = document.querySelector('#cancel-singing-button');
+const singingSongButton = document.querySelector('#singing-song-button');
 let position = 42;
 let walking = false;
 let clickTimer;
@@ -34,6 +39,8 @@ let petStartLeft = 0;
 let petStartTop = 0;
 let isFeedingMode = false;
 let isInteractionMode = false;
+let isSingingMode = false;
+const normalPetImageSource = petImage.getAttribute('src');
 let activeFood = null;
 let foodDragOffsetX = 0;
 let foodDragOffsetY = 0;
@@ -88,7 +95,13 @@ const deathSound = createSound('audio/死亡音效.wav');
 const deathNoteSound = createSound('audio/死亡筆記本.wav');
 const moralSound = createSound('audio/做事要講良心.wav');
 const genshinSound = createSound('audio/好想玩原神.wav');
-const gameSounds = [hurtSound, landingSound, screamSound, deathSound, deathNoteSound, moralSound, genshinSound];
+const singingSound = createSound('audio/壱雫空.wav');
+const gameSounds = [hurtSound, landingSound, screamSound, deathSound, deathNoteSound, moralSound, genshinSound, singingSound];
+const SINGING_WAVEFORM_FPS = 20;
+const SINGING_WAVEFORM = Uint8Array.of(42,44,54,56,58,62,60,60,63,68,69,69,86,80,72,66,68,70,70,70,70,72,69,43,4,59,62,65,63,59,53,70,71,68,57,16,70,100,89,85,92,82,87,100,77,85,86,82,85,100,83,89,84,66,77,99,95,93,89,76,85,100,79,92,80,73,90,100,100,89,88,86,92,91,74,88,77,74,97,99,98,92,84,87,100,91,87,91,84,81,100,88,93,86,87,85,99,84,88,87,70,80,100,99,97,85,81,85,99,81,92,85,80,83,100,98,95,91,85,94,97,78,89,77,72,94,98,100,88,80,69,97,89,88,83,76,74,100,97,100,87,81,88,100,79,91,76,72,86,100,100,95,84,76,92,97,83,92,82,79,98,99,99,93,79,83,95,93,80,87,83,89,99,99,97,84,73,81,92,95,77,89,87,85,96,99,95,95,84,83,98,87,83,95,87,92,83,90,84,100,100,100,89,86,91,96,78,89,99,74,93,78,76,87,96,84,92,98,68,89,82,81,86,78,76,96,94,87,96,99,90,91,81,75,91,83,90,100,77,83,100,87,86,89,82,78,83,82,87,97,90,92,100,73,88,82,82,84,83,82,90,96,80,87,99,71,92,85,72,85,75,75,98,94,80,93,98,80,99,76,77,81,81,84,98,83,80,99,85,88,89,85,83,84,84,88,98,83,84,99,81,90,86,81,85,98,96,96,93,79,100,98,96,94,79,81,82,80,80,90,86,84,82,86,77,90,76,74,95,91,79,92,82,83,99,81,82,90,82,84,100,80,88,84,84,82,81,76,74,91,72,88,92,70,83,84,81,89,99,76,85,82,78,87,99,78,88,86,80,83,74,91,85,79,69,82,89,83,90,86,86,89,85,85,87,84,85,95,93,85,96,92,90,89,88,80,84,68,42,71,54,52,60,62,63,60,39,47,58,15,62,65,68,73,69,65,69,69,66,67,67,65,93,90,75,91,73,70,92,70,76,90,76,75);
+const SINGING_BEATS = [[.07,.34],[.61,.27],[1.26,.83],[1.57,.48],[1.83,.74],[2.28,.95],[3.04,.64],[3.47,1],[3.76,.8],[4.62,.52],[4.94,.8],[5.14,.53],[5.82,.73],[6.26,.62],[6.95,.56],[7.28,.84],[7.57,.61],[7.87,.74],[8.37,.58],[8.58,.7],[8.94,.7],[9.31,.55],[9.55,.66],[9.79,.65],[10.53,1],[10.85,.99],[11.26,.82],[11.45,.78],[11.99,.93],[12.43,.71],[12.73,1],[13.03,.92],[13.32,1],[13.9,1],[14.49,.94],[14.99,.62],[15.24,.75],[15.51,.76],[15.96,1],[16.42,.77],[16.82,.52],[17.13,.52],[17.59,.7],[17.89,.83],[18.32,.85],[18.55,.79],[19.06,.74],[19.49,.88],[19.76,.48],[19.95,.83],[20.52,.61],[21.11,1],[21.41,1]];
+const SINGING_CHOREOGRAPHY = [[0,0],[1.26,-7],[2.28,5],[3.47,-3],[4.62,10],[5.82,1],[7.28,-11],[8.58,7],[10.53,0],[11.99,-13],[13.32,13],[14.99,3],[15.96,-8],[17.59,9],[19.06,-5],[20.52,5],[21.66,0]];
+let singingAnimationFrame;
 
 function ensureAudioGraph() {
   if (!AudioContextClass) return null;
@@ -216,6 +229,7 @@ function toggleSettings() {
   if (isOpen) {
     setFeedingMode(false);
     setInteractionMode(false);
+    setSingingMode(false);
   }
   if (isOpen && clickTimer) {
     window.clearTimeout(clickTimer);
@@ -374,6 +388,7 @@ function releaseCapturedFoodPointer(pointerId) {
 function setFeedingMode(enabled) {
   if (enabled && (isSettingsOpen() || isDead || isDragging || isFalling)) return;
   if (enabled) setInteractionMode(false);
+  if (enabled) setSingingMode(false);
   isFeedingMode = enabled;
   document.body.classList.toggle('feeding-mode', enabled);
   foodPicker.inert = !enabled;
@@ -404,6 +419,7 @@ function setFeedingMode(enabled) {
 
 function setInteractionMode(enabled) {
   if (enabled && (isSettingsOpen() || isDead || isFeedingMode)) return;
+  if (enabled) setSingingMode(false);
   isInteractionMode = enabled;
   document.body.classList.toggle('interaction-mode', enabled);
   interactionPicker.inert = !enabled;
@@ -411,6 +427,86 @@ function setInteractionMode(enabled) {
   interactButton.setAttribute('aria-pressed', String(enabled));
   interactButton.setAttribute('aria-label', enabled ? '結束互動選單' : '與企鵝互動');
   interactButtonLabel.textContent = enabled ? '取消互動' : '互動';
+}
+
+function stopSingingWaveAnimation() {
+  if (singingAnimationFrame !== undefined) {
+    window.cancelAnimationFrame(singingAnimationFrame);
+    singingAnimationFrame = undefined;
+  }
+  document.body.classList.remove('singing-song-playing');
+  petImage.style.removeProperty('--singing-lift');
+  petImage.style.removeProperty('--singing-tilt');
+  petImage.style.removeProperty('--singing-scale');
+}
+
+function startSingingWaveAnimation(getCurrentTime) {
+  stopSingingWaveAnimation();
+  document.body.classList.add('singing-song-playing');
+  const startLeft = pet.getBoundingClientRect().left;
+  let previousLeft = startLeft;
+
+  const animate = () => {
+    if (!isSingingMode) {
+      stopSingingWaveAnimation();
+      return;
+    }
+    const currentTime = Math.max(0, getCurrentTime());
+    const sampleIndex = Math.min(SINGING_WAVEFORM.length - 1, Math.floor(currentTime * SINGING_WAVEFORM_FPS));
+    const energy = SINGING_WAVEFORM[sampleIndex] / 100;
+    let beatPulse = 0;
+    SINGING_BEATS.forEach(([beatTime, strength]) => {
+      const elapsedSinceBeat = currentTime - beatTime;
+      if (elapsedSinceBeat < 0 || elapsedSinceBeat > .18) return;
+      beatPulse = Math.max(beatPulse, strength * (1 - elapsedSinceBeat / .18) ** 2);
+    });
+
+    let choreographyOffset = SINGING_CHOREOGRAPHY[SINGING_CHOREOGRAPHY.length - 1][1];
+    for (let index = 1; index < SINGING_CHOREOGRAPHY.length; index += 1) {
+      const [nextTime, nextOffset] = SINGING_CHOREOGRAPHY[index];
+      if (currentTime > nextTime) continue;
+      const [previousTime, previousOffset] = SINGING_CHOREOGRAPHY[index - 1];
+      const progress = Math.max(0, Math.min(1, (currentTime - previousTime) / (nextTime - previousTime)));
+      const easedProgress = .5 - Math.cos(progress * Math.PI) / 2;
+      choreographyOffset = previousOffset + (nextOffset - previousOffset) * easedProgress;
+      break;
+    }
+
+    const maxLeft = window.innerWidth - pet.offsetWidth;
+    const nextLeft = Math.max(0, Math.min(maxLeft, startLeft + choreographyOffset * window.innerWidth / 100));
+    if (Math.abs(nextLeft - previousLeft) > .08) pet.classList.toggle('facing-left', nextLeft < previousLeft);
+    pet.style.left = `${nextLeft}px`;
+    previousLeft = nextLeft;
+    position = (nextLeft / window.innerWidth) * 100;
+
+    const beatDirection = Math.sin(currentTime * Math.PI * 5);
+    petImage.style.setProperty('--singing-lift', `${(-energy * .35 - beatPulse * 9).toFixed(2)}px`);
+    petImage.style.setProperty('--singing-tilt', `${(beatDirection * (.12 + beatPulse * 2.8)).toFixed(2)}deg`);
+    petImage.style.setProperty('--singing-scale', (1 + energy * .002 + beatPulse * .13).toFixed(3));
+    singingAnimationFrame = window.requestAnimationFrame(animate);
+  };
+
+  animate();
+}
+
+function setSingingMode(enabled) {
+  isSingingMode = enabled;
+  document.body.classList.toggle('singing-mode', enabled);
+  singingPicker.inert = !enabled;
+  singingPicker.setAttribute('aria-hidden', String(!enabled));
+  petImage.src = enabled ? 'assets/gugugaga-sing.png' : normalPetImageSource;
+  petImage.alt = enabled ? '唱歌中的企鵝' : '企鵝';
+  if (!enabled) {
+    stopSound(singingSound);
+    stopSingingWaveAnimation();
+  }
+}
+
+function playSingingSong() {
+  if (!isSingingMode || isDead) return;
+  unlockGameSounds();
+  stopSound(singingSound);
+  playSound(singingSound);
 }
 
 function moveFoodWithPointer(event) {
@@ -712,7 +808,7 @@ function updateFeedingBehavior() {
 }
 
 function movePenguin() {
-  if (isFeedingMode || isSettingsOpen() || isDead || isDragging || isFalling || pet.classList.contains('jumping') || pet.classList.contains('crazy-flying')) return;
+  if (isFeedingMode || isSingingMode || isSettingsOpen() || isDead || isDragging || isFalling || pet.classList.contains('jumping') || pet.classList.contains('crazy-flying')) return;
   const maxPosition = Math.max(8, ((window.innerWidth - pet.offsetWidth) / window.innerWidth) * 100);
   const next = Math.round(4 + Math.random() * Math.max(0, maxPosition - 8));
   pet.classList.toggle('facing-left', next < position);
@@ -769,7 +865,7 @@ function crazyFly() {
 }
 
 pet.addEventListener('click', (event) => {
-  if (isFeedingMode || isSettingsOpen() || isDead) return;
+  if (isFeedingMode || isSingingMode || isSettingsOpen() || isDead) return;
   if (suppressNextClick) {
     suppressNextClick = false;
     return;
@@ -817,14 +913,19 @@ function loadSoundBuffer(sound) {
 
 function startSoundBuffer(sound, onEnded) {
   const source = audioContext.createBufferSource();
+  const startedAt = audioContext.currentTime;
   source.buffer = sound.buffer;
   source.connect(masterGainNode);
   sound.sources.add(source);
   source.addEventListener('ended', () => {
     sound.sources.delete(source);
+    if (sound === singingSound && sound.sources.size === 0) stopSingingWaveAnimation();
     onEnded?.();
   }, { once: true });
   source.start();
+  if (sound === singingSound) {
+    startSingingWaveAnimation(() => audioContext.currentTime - startedAt);
+  }
 }
 
 function playSoundBuffer(sound, onEnded) {
@@ -832,6 +933,7 @@ function playSoundBuffer(sound, onEnded) {
   if (audioContext.state !== 'running') {
     audioContext.resume()
       .then(() => {
+        if (sound === singingSound && !isSingingMode) return;
         if (audioContext.state === 'running') startSoundBuffer(sound, onEnded);
         else playSoundFallback(sound, onEnded);
       })
@@ -885,6 +987,7 @@ function unlockGameSounds() {
   unlockSound(deathNoteSound);
   unlockSound(moralSound);
   unlockSound(genshinSound);
+  unlockSound(singingSound);
   if (genshinSoundPending) {
     genshinSoundPending = false;
     genshinSoundPlayed = true;
@@ -901,18 +1004,24 @@ function playSoundFallback(sound, onEnded) {
     if (completed) return;
     completed = true;
     sound.element.removeEventListener('ended', complete);
+    if (sound === singingSound) stopSingingWaveAnimation();
     onEnded?.();
   };
   if (onEnded) sound.element.addEventListener('ended', complete, { once: true });
   sound.element.muted = false;
   sound.element.currentTime = 0;
-  sound.element.play().catch(complete);
+  sound.element.play()
+    .then(() => {
+      if (sound === singingSound) startSingingWaveAnimation(() => sound.element.currentTime);
+    })
+    .catch(complete);
 }
 
 function playSound(sound, onEnded) {
   if (playSoundBuffer(sound, onEnded)) return;
   if (AudioContextClass) {
     loadSoundBuffer(sound).then((buffer) => {
+      if (sound === singingSound && !isSingingMode) return;
       if (buffer) playSoundBuffer(sound, onEnded);
       else playSoundFallback(sound, onEnded);
     });
@@ -944,12 +1053,14 @@ function stopSound(sound) {
   sound.sources.clear();
   sound.element.pause();
   sound.element.currentTime = 0;
+  if (sound === singingSound) stopSingingWaveAnimation();
 }
 
 function triggerDeath(cause = '企鵝失去了所有血量') {
   if (isDead) return;
   isDead = true;
   setFeedingMode(false);
+  setSingingMode(false);
   isDragging = false;
   isFalling = false;
   walking = false;
@@ -985,6 +1096,7 @@ function triggerDeath(cause = '企鵝失去了所有血量') {
 
 function restartGame() {
   setFeedingMode(false);
+  setSingingMode(false);
   isDead = false;
   isDragging = false;
   isFalling = false;
@@ -1071,7 +1183,7 @@ function healFromFullHunger() {
 }
 
 pet.addEventListener('pointerdown', (event) => {
-  if (isFeedingMode || isSettingsOpen() || isDead || isFalling || pet.classList.contains('jumping') || pet.classList.contains('spinning') || pet.classList.contains('crazy-flying')) return;
+  if (isFeedingMode || isSingingMode || isSettingsOpen() || isDead || isFalling || pet.classList.contains('jumping') || pet.classList.contains('spinning') || pet.classList.contains('crazy-flying')) return;
   unlockGameSounds();
   const rect = pet.getBoundingClientRect();
   dragStartX = event.clientX;
@@ -1143,6 +1255,17 @@ interactButton.addEventListener('click', () => {
   setFeedingMode(false);
   setInteractionMode(!isInteractionMode);
 });
+
+singingButton.addEventListener('click', () => {
+  setInteractionMode(false);
+  setSingingMode(true);
+});
+
+cancelSingingButton.addEventListener('click', () => {
+  setSingingMode(false);
+});
+
+singingSongButton.addEventListener('click', playSingingSong);
 
 foodPicker.querySelectorAll('[data-food-type]').forEach((button) => {
   button.addEventListener('pointerdown', (event) => prepareFoodPointerDrag(button.dataset.foodType, event));
