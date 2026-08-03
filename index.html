@@ -93,11 +93,15 @@
           <button type="button" data-food-type="stone" aria-label="拖曳石頭"><span class="food-art food-art-stone" aria-hidden="true"></span><span>石頭</span></button>
         </div>
         <div id="interaction-picker" class="interaction-picker" aria-label="選擇互動" aria-hidden="true" inert>
-          <button type="button">唱歌</button>
+          <button id="singing-button" type="button">唱歌</button>
           <button type="button">玩球</button>
           <button type="button">猜拳</button>
           <button type="button">捉迷藏</button>
           <button type="button">音遊</button>
+        </div>
+        <div id="singing-picker" class="singing-picker" aria-label="唱歌模式" aria-hidden="true" inert>
+          <button id="cancel-singing-button" type="button">取消唱歌</button>
+          <button id="singing-song-button" type="button">壱雫空</button>
         </div>
       </section>
       <section id="death-screen" class="death-screen" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="death-title" inert>
