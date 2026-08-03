@@ -7,10 +7,10 @@ body { margin: 0; overflow: hidden; overscroll-behavior: none; background: #8ed7
 .settings-button:active { transform: scale(.94); }
 .settings-button:focus-visible { outline: 3px solid #38515b; outline-offset: 3px; }
 .settings-button svg { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform .35s ease; }
-.settings-menu { position: absolute; z-index: 11; top: 76px; left: 18px; width: min(380px, calc(100vw - 36px)); height: min(55vh, 460px); visibility: hidden; opacity: 0; border: 1px solid #ffffff8c; border-radius: 18px; background: #ffffff80; box-shadow: 0 16px 40px #38515b2b; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); transition: opacity .25s ease, visibility 0s linear .25s; }
+.settings-menu { position: absolute; z-index: 11; top: 76px; left: 18px; width: min(380px, calc(100vw - 36px)); height: min(55vh, 460px); padding: 16px; overflow-y: auto; visibility: hidden; opacity: 0; border: 1px solid #ffffff8c; border-radius: 18px; background: #ffffff80; box-shadow: 0 16px 40px #38515b2b; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); transition: opacity .25s ease, visibility 0s linear .25s; }
 body.settings-open .settings-button svg { transform: rotate(90deg); }
 body.settings-open .settings-menu { visibility: visible; opacity: 1; transition-delay: 0s; }
-body.settings-open .hud, body.settings-open .debug-panel, body.settings-open .feature-panel { visibility: hidden; opacity: 0; pointer-events: none; }
+body.settings-open .hud, body.settings-open .feature-panel { visibility: hidden; opacity: 0; pointer-events: none; }
 body.settings-open .pet { pointer-events: none; }
 body.feeding-mode .pet { pointer-events: none; }
 .sky { position: absolute; inset: 0 0 28%; background: #80d2ef; transition: background .8s ease; }
@@ -55,13 +55,15 @@ body.feeding-mode .pet { pointer-events: none; }
 .death-content button:focus-visible { outline: 3px solid white; outline-offset: 4px; }
 .debug-panel, .feature-panel { position: absolute; z-index: 4; bottom: 18px; display: grid; gap: 7px; padding: 11px; border-radius: 10px; background: #ffffffc4; color: #38515b; font-size: 12px; font-weight: 700; transition: opacity .2s ease, visibility .2s ease; }
 .debug-panel { left: 18px; } .feature-panel { right: 18px; }
+.settings-menu .debug-panel { position: static; z-index: auto; padding: 0; border-radius: 0; background: transparent; }
+.settings-menu .debug-panel > span { display: block; }
 .debug-panel button, .feature-panel button { padding: 7px 9px; border: 0; border-radius: 6px; background: #38515b; color: white; cursor: pointer; font: inherit; }
 .feature-panel button { display: flex; align-items: center; justify-content: center; gap: 5px; } .feature-panel button svg { width: 15px; height: 15px; fill: #ef6f71; stroke: #ef6f71; stroke-width: 1.5; }
 .feature-actions { display: grid; grid-template-columns: repeat(2, minmax(72px, 1fr)); gap: 7px; }
 .food-picker { display: none; grid-template-columns: repeat(2, minmax(72px, 1fr)); gap: 7px; }
 body.feeding-mode .food-picker { display: grid; }
 body.feeding-mode #feed-button { background: #b45b5b; }
-body.feeding-mode .settings-button, body.feeding-mode .debug-panel { visibility: hidden; opacity: 0; pointer-events: none; }
+body.feeding-mode .settings-button { visibility: hidden; opacity: 0; pointer-events: none; }
 body.feeding-mode .feature-actions { grid-template-columns: 1fr; }
 body.feeding-mode #interact-button { display: none; }
 .food-picker button { flex-direction: column; min-height: 68px; background: #52747f; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
