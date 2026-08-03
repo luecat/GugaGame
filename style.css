@@ -86,6 +86,7 @@ body.interaction-mode #interact-button { background: #b45b5b; }
 .singing-picker #cancel-singing-button { background: #b45b5b; }
 body.singing-mode .feature-actions, body.singing-mode .food-picker, body.singing-mode .interaction-picker { display: none; }
 body.singing-mode .singing-picker { display: grid; }
+body.singing-mode .pet { display: block; visibility: visible; opacity: 1; }
 body.singing-mode .settings-button { visibility: hidden; opacity: 0; pointer-events: none; }
 body.singing-song-playing .pet { transition: none; }
 body.singing-song-playing .pet img { transform: translateY(var(--singing-lift, 0)) rotate(var(--singing-tilt, 0deg)) scale(var(--singing-scale, 1)); transition: transform 50ms linear; }
