@@ -11,7 +11,7 @@
     <meta property="og:description" content="Gugagame" />
     <meta property="og:type" content="website" />
     <title>Gugagame</title>
-    <link rel="stylesheet" href="style.css?v=20260803-08" />
+    <link rel="stylesheet" href="style.css?v=20260803-09" />
   </head>
   <body>
     <main class="world" aria-label="企鵝的草地">
@@ -21,7 +21,16 @@
           <circle cx="12" cy="12" r="3" />
         </svg>
       </button>
-      <section id="settings-menu" class="settings-menu" aria-label="設定選單" aria-hidden="true"></section>
+      <section id="settings-menu" class="settings-menu" aria-label="設定選單" aria-hidden="true">
+        <section class="debug-panel" aria-label="調試專區">
+          <span>調試專區</span>
+          <button id="debug-day-night" type="button">切換晝夜預覽</button>
+          <button id="debug-hurt" type="button">扣血測試</button>
+          <button id="debug-full-hunger" type="button">飽食滿格</button>
+          <button id="debug-cloud-count" type="button">改雲數量</button>
+          <button id="debug-death" type="button">死亡測試</button>
+        </section>
+      </section>
       <div class="sky" aria-hidden="true">
         <svg class="celestial sun" viewBox="0 0 100 100" role="presentation"><circle cx="50" cy="50" r="22" /><path d="M50 5v15M50 80v15M5 50h15M80 50h15M18 18l11 11M71 71l11 11M82 18 71 29M29 71 18 82" /></svg>
         <svg class="celestial moon" viewBox="0 0 100 100" role="presentation"><path d="M68 76A34 34 0 0 1 35 22a34 34 0 1 0 33 54Z" /></svg>
@@ -56,15 +65,6 @@
       <button id="pet" class="pet" aria-label="點擊企鵝讓牠跳躍">
         <img src="assets/gugugaga-white.png" alt="企鵝" draggable="false" />
       </button>
-      <!-- DEBUG ONLY: This panel is deliberately separate from game controls. -->
-      <section class="debug-panel" aria-label="調試專區">
-        <span>調試專區</span>
-        <button id="debug-day-night" type="button">切換晝夜預覽</button>
-        <button id="debug-hurt" type="button">扣血測試</button>
-        <button id="debug-full-hunger" type="button">飽食滿格</button>
-        <button id="debug-cloud-count" type="button">改雲數量</button>
-        <button id="debug-death" type="button">死亡測試</button>
-      </section>
       <section class="feature-panel" aria-label="功能專區">
         <div class="feature-actions">
           <button id="feed-button" type="button" aria-label="餵食企鵝">

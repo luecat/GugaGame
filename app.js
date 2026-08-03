@@ -8,7 +8,6 @@ const cloudLayer = document.querySelector('#cloud-layer');
 const cloudTemplate = document.querySelector('#cloud-template');
 const settingsButton = document.querySelector('#settings-button');
 const settingsMenu = document.querySelector('#settings-menu');
-const debugPanel = document.querySelector('.debug-panel');
 const featurePanel = document.querySelector('.feature-panel');
 const feedButton = document.querySelector('#feed-button');
 const feedButtonLabel = document.querySelector('#feed-button-label');
@@ -173,7 +172,6 @@ function toggleSettings() {
     clickCount = 0;
   }
   pet.disabled = isOpen;
-  debugPanel.inert = isOpen;
   featurePanel.inert = isOpen;
   settingsButton.setAttribute('aria-expanded', String(isOpen));
   settingsButton.setAttribute('aria-label', isOpen ? '關閉設定' : '開啟設定');
