@@ -41,6 +41,7 @@ let isFeedingMode = false;
 let isInteractionMode = false;
 let isSingingMode = false;
 const normalPetImageSource = petImage.getAttribute('src');
+const singingPetImageSource = new URL('assets/gugugaga-sing.png?v=20260803-13', document.baseURI).href;
 let activeFood = null;
 let foodDragOffsetX = 0;
 let foodDragOffsetY = 0;
@@ -503,7 +504,7 @@ function setSingingMode(enabled) {
   document.body.classList.toggle('singing-mode', enabled);
   singingPicker.inert = !enabled;
   singingPicker.setAttribute('aria-hidden', String(!enabled));
-  petImage.src = enabled ? 'assets/gugugaga-sing.png?v=20260803-12' : normalPetImageSource;
+  petImage.src = enabled ? singingPetImageSource : normalPetImageSource;
   petImage.alt = enabled ? '唱歌中的企鵝' : '企鵝';
   if (!enabled) {
     stopSound(singingSound);
