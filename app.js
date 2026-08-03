@@ -44,6 +44,9 @@ let missedFeedingJumps = 0;
 let moralSoundHasPlayed = false;
 let moralSoundPlaying = false;
 let moralSoundPlaybackId = 0;
+let stoneGreetingFood = null;
+let stoneGreetingCompletedFood = null;
+let stoneGreetingTimer;
 let lastFeedingJumpAt = 0;
 const AudioContextClass = window.AudioContext || window.webkitAudioContext;
 let audioContext;
@@ -51,6 +54,7 @@ let audioContextPrimed = false;
 let gameAudioActivated = false;
 let genshinSoundPending = false;
 let genshinSoundPlayed = false;
+let lockedCloudCount = null;
 
 function createSound(path) {
   const element = new Audio(path);
@@ -97,6 +101,8 @@ const FOOD_EAT_DELAY_MS = 1000;
 const FOOD_FALL_GRAVITY = 1600;
 const FOOD_GROUND_FADE_DELAY_MS = 300;
 const FOOD_GROUND_FADE_DURATION_MS = 500;
+const STONE_GROUND_LIFETIME_MS = 3000;
+const STONE_GREETING_LOOK_MS = 240;
 const USE_IOS_TOUCH_DRAG = /iPad|iPhone|iPod/.test(navigator.userAgent)
   || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 let debugCloudCount = null;
@@ -110,6 +116,7 @@ function isSettingsOpen() {
 }
 
 function renderClouds(count) {
+  if (lockedCloudCount !== null && count !== lockedCloudCount) return;
   cloudLayer.replaceChildren();
 
   for (let index = 0; index < count; index += 1) {
@@ -126,13 +133,21 @@ function renderClouds(count) {
   if (count === 9 && !genshinSoundPlayed && !genshinSoundPending) {
     if (gameAudioActivated) {
       genshinSoundPlayed = true;
-      playSound(genshinSound);
+      playGenshinSoundWithCloudLock(count);
     } else {
       genshinSoundPending = true;
     }
   } else if (count !== 9) {
     genshinSoundPending = false;
   }
+}
+
+function playGenshinSoundWithCloudLock(count = cloudLayer.childElementCount) {
+  lockedCloudCount = count;
+  playSound(genshinSound, () => {
+    lockedCloudCount = null;
+    updateCloudsFromClock();
+  });
 }
 
 function updateCloudsFromClock() {
@@ -214,13 +229,19 @@ function resetMoralSoundSequence(stopPlayback = false) {
 function removeActiveFood() {
   cancelFoodFall();
   if (!activeFood) return;
-  const wasMovingForFood = pet.classList.contains('feeding-chasing')
-    || pet.classList.contains('feeding-running-away');
-  const currentPetLeft = wasMovingForFood ? pet.getBoundingClientRect().left : 0;
+  cancelStoneGreeting();
+  stoneGreetingCompletedFood = null;
   activeFood.remove();
   activeFood = null;
   foodDragPointerId = null;
   activeFoodEdibleAt = 0;
+  stopFeedingMovement();
+}
+
+function stopFeedingMovement() {
+  const wasMovingForFood = pet.classList.contains('feeding-chasing')
+    || pet.classList.contains('feeding-running-away');
+  const currentPetLeft = wasMovingForFood ? pet.getBoundingClientRect().left : 0;
   pet.classList.remove('feeding-chasing', 'feeding-running-away', 'walking');
   if (wasMovingForFood) {
     pet.style.left = `${currentPetLeft}px`;
@@ -245,9 +266,12 @@ function landFood(food) {
   foodFallFrame = undefined;
   food.classList.remove('falling');
   food.classList.add('landed');
+  const lifetime = food.dataset.foodType === 'stone'
+    ? STONE_GROUND_LIFETIME_MS
+    : FOOD_GROUND_FADE_DELAY_MS + FOOD_GROUND_FADE_DURATION_MS;
   foodGroundTimer = window.setTimeout(() => {
     if (activeFood === food && foodDragPointerId === null) removeActiveFood();
-  }, FOOD_GROUND_FADE_DELAY_MS + FOOD_GROUND_FADE_DURATION_MS);
+  }, lifetime);
 }
 
 function startFoodFall() {
@@ -338,9 +362,10 @@ function moveFoodWithPointer(event) {
   }
   if (!activeFood || foodDragPointerId !== event.pointerId) return;
   const maxLeft = window.innerWidth - activeFood.offsetWidth;
-  const maxTop = grass.getBoundingClientRect().top - activeFood.offsetHeight;
+  const maxTop = window.innerHeight - activeFood.offsetHeight;
   activeFood.style.left = `${Math.max(0, Math.min(maxLeft, event.clientX - foodDragOffsetX))}px`;
   activeFood.style.top = `${Math.max(0, Math.min(maxTop, event.clientY - foodDragOffsetY))}px`;
+  syncStoneGreeting(activeFood);
 }
 
 function releaseFoodPointer(event) {
@@ -495,6 +520,54 @@ function tryCollectFood() {
   return withinHorizontalReach && withinVerticalReach ? collectFood() : false;
 }
 
+function isFoodAboveGrass(food = activeFood) {
+  if (!food) return false;
+  return food.getBoundingClientRect().bottom <= grass.getBoundingClientRect().top;
+}
+
+function cancelStoneGreeting() {
+  if (stoneGreetingTimer !== undefined) {
+    window.clearTimeout(stoneGreetingTimer);
+    stoneGreetingTimer = undefined;
+  }
+  stoneGreetingFood = null;
+  pet.classList.remove('stone-greeting');
+}
+
+function finishStoneGreeting(food) {
+  if (stoneGreetingFood !== food) return;
+  stoneGreetingFood = null;
+  stoneGreetingCompletedFood = food;
+  pet.classList.remove('stone-greeting');
+}
+
+function startStoneGreeting(food) {
+  cancelStoneGreeting();
+  if (activeFood !== food || !isFeedingMode || !isFoodAboveGrass(food)) return;
+  const foodRect = food.getBoundingClientRect();
+  const petRect = pet.getBoundingClientRect();
+  const foodIsLeft = foodRect.left + foodRect.width / 2 < petRect.left + petRect.width / 2;
+  stoneGreetingFood = food;
+  pet.classList.remove('feeding-chasing', 'feeding-running-away', 'walking');
+  pet.classList.toggle('facing-left', foodIsLeft);
+  pet.classList.add('stone-greeting');
+  stoneGreetingTimer = window.setTimeout(() => {
+    stoneGreetingTimer = undefined;
+    if (stoneGreetingFood !== food || activeFood !== food || !isFeedingMode) return;
+    playScreamSound(() => finishStoneGreeting(food));
+  }, STONE_GREETING_LOOK_MS);
+}
+
+function syncStoneGreeting(food) {
+  if (food.dataset.foodType !== 'stone') return;
+  if (!isFoodAboveGrass(food)) {
+    if (stoneGreetingFood === food) cancelStoneGreeting();
+    return;
+  }
+  if (stoneGreetingFood === food || stoneGreetingCompletedFood === food) return;
+  startStoneGreeting(food);
+}
+
 function startFeedingJump() {
   const now = Date.now();
   if (feedingJumpActive || now - lastFeedingJumpAt < FEEDING_JUMP_COOLDOWN_MS) return;
@@ -537,6 +610,12 @@ function runAwayFromFood() {
 
 function updateFeedingBehavior() {
   if (!isFeedingMode || isSettingsOpen() || isDead || !activeFood) return;
+  if (!isFoodAboveGrass()) {
+    if (stoneGreetingFood === activeFood) cancelStoneGreeting();
+    stopFeedingMovement();
+    return;
+  }
+  if (stoneGreetingFood === activeFood) return;
   if (hunger >= MAX_HUNGER) {
     runAwayFromFood();
     return;
@@ -748,7 +827,7 @@ function unlockGameSounds() {
   if (genshinSoundPending) {
     genshinSoundPending = false;
     genshinSoundPlayed = true;
-    window.setTimeout(() => playSound(genshinSound), 0);
+    window.setTimeout(() => playGenshinSoundWithCloudLock(), 0);
   }
 }
 
@@ -793,8 +872,8 @@ function playDeathSound() {
   playSound(deathSound);
 }
 
-function playScreamSound() {
-  if (!playSoundBuffer(screamSound)) playSoundFallback(screamSound);
+function playScreamSound(onEnded) {
+  if (!playSoundBuffer(screamSound, onEnded)) playSoundFallback(screamSound, onEnded);
 }
 
 function stopSound(sound) {
