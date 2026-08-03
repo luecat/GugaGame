@@ -11,7 +11,7 @@
     <meta property="og:description" content="Gugagame" />
     <meta property="og:type" content="website" />
     <title>Gugagame</title>
-    <link rel="stylesheet" href="style.css?v=20260803-09" />
+    <link rel="stylesheet" href="style.css?v=20260803-11" />
   </head>
   <body>
     <main class="world" aria-label="企鵝的草地">
@@ -22,6 +22,18 @@
         </svg>
       </button>
       <section id="settings-menu" class="settings-menu" aria-label="設定選單" aria-hidden="true">
+        <div class="volume-setting">
+          <label for="volume-slider">網頁音量</label>
+          <div class="volume-control">
+            <input id="volume-slider" type="range" min="0" max="100" step="1" value="100" aria-label="網頁音量" />
+            <svg class="volume-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M11 5 6.5 9H3v6h3.5l4.5 4V5Z" />
+              <path class="volume-wave volume-wave-inner" d="M14.5 9a4 4 0 0 1 0 6" />
+              <path class="volume-wave volume-wave-outer" d="M17.5 6a8 8 0 0 1 0 12" />
+              <path class="volume-muted-mark" d="m15 9 6 6m0-6-6 6" />
+            </svg>
+          </div>
+        </div>
         <section class="debug-panel" aria-label="調試專區">
           <span>調試專區</span>
           <button id="debug-day-night" type="button">切換晝夜預覽</button>
@@ -73,12 +85,19 @@
           </button>
           <button id="interact-button" type="button" aria-label="與企鵝互動">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5h16v11H9l-5 4v-15Z" /><path d="M8 10h8M8 13h5" /></svg>
-            <span>互動</span>
+            <span id="interact-button-label">互動</span>
           </button>
         </div>
         <div id="food-picker" class="food-picker" aria-label="選擇食物" aria-hidden="true" inert>
           <button type="button" data-food-type="apple" aria-label="拖曳蘋果"><span class="food-art food-art-apple" aria-hidden="true"></span><span>蘋果</span></button>
           <button type="button" data-food-type="stone" aria-label="拖曳石頭"><span class="food-art food-art-stone" aria-hidden="true"></span><span>石頭</span></button>
+        </div>
+        <div id="interaction-picker" class="interaction-picker" aria-label="選擇互動" aria-hidden="true" inert>
+          <button type="button">唱歌</button>
+          <button type="button">玩球</button>
+          <button type="button">猜拳</button>
+          <button type="button">捉迷藏</button>
+          <button type="button">音遊</button>
         </div>
       </section>
       <section id="death-screen" class="death-screen" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="death-title" inert>
@@ -89,6 +108,6 @@
         </div>
       </section>
     </main>
-    <script src="app.js?v=20260803-05"></script>
+    <script src="app.js?v=20260803-11"></script>
   </body>
 </html>

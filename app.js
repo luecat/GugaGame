@@ -8,10 +8,15 @@ const cloudLayer = document.querySelector('#cloud-layer');
 const cloudTemplate = document.querySelector('#cloud-template');
 const settingsButton = document.querySelector('#settings-button');
 const settingsMenu = document.querySelector('#settings-menu');
+const volumeSlider = document.querySelector('#volume-slider');
+const volumeControl = document.querySelector('.volume-control');
 const featurePanel = document.querySelector('.feature-panel');
 const feedButton = document.querySelector('#feed-button');
 const feedButtonLabel = document.querySelector('#feed-button-label');
 const foodPicker = document.querySelector('#food-picker');
+const interactButton = document.querySelector('#interact-button');
+const interactButtonLabel = document.querySelector('#interact-button-label');
+const interactionPicker = document.querySelector('#interaction-picker');
 let position = 42;
 let walking = false;
 let clickTimer;
@@ -28,6 +33,7 @@ let dragStartY = 0;
 let petStartLeft = 0;
 let petStartTop = 0;
 let isFeedingMode = false;
+let isInteractionMode = false;
 let activeFood = null;
 let foodDragOffsetX = 0;
 let foodDragOffsetY = 0;
@@ -49,11 +55,25 @@ let stoneGreetingTimer;
 let lastFeedingJumpAt = 0;
 const AudioContextClass = window.AudioContext || window.webkitAudioContext;
 let audioContext;
+let masterGainNode;
 let audioContextPrimed = false;
 let gameAudioActivated = false;
 let genshinSoundPending = false;
 let genshinSoundPlayed = false;
 let lockedCloudCount = null;
+const VOLUME_STORAGE_KEY = 'gugagame-web-volume';
+
+function readSavedVolume() {
+  try {
+    const storedVolume = window.localStorage.getItem(VOLUME_STORAGE_KEY);
+    if (storedVolume === null) return 1;
+    const savedVolume = Number(storedVolume);
+    if (Number.isFinite(savedVolume)) return Math.max(0, Math.min(1, savedVolume));
+  } catch {}
+  return 1;
+}
+
+let gameVolume = readSavedVolume();
 
 function createSound(path) {
   const element = new Audio(path);
@@ -68,6 +88,34 @@ const deathSound = createSound('audio/死亡音效.wav');
 const deathNoteSound = createSound('audio/死亡筆記本.wav');
 const moralSound = createSound('audio/做事要講良心.wav');
 const genshinSound = createSound('audio/好想玩原神.wav');
+const gameSounds = [hurtSound, landingSound, screamSound, deathSound, deathNoteSound, moralSound, genshinSound];
+
+function ensureAudioGraph() {
+  if (!AudioContextClass) return null;
+  if (!audioContext) audioContext = new AudioContextClass();
+  if (!masterGainNode) {
+    masterGainNode = audioContext.createGain();
+    masterGainNode.gain.value = gameVolume;
+    masterGainNode.connect(audioContext.destination);
+  }
+  return audioContext;
+}
+
+function setGameVolume(volume, persist = true) {
+  gameVolume = Math.max(0, Math.min(1, volume));
+  gameSounds.forEach((sound) => { sound.element.volume = gameVolume; });
+  if (masterGainNode) masterGainNode.gain.value = gameVolume;
+  volumeSlider.value = String(Math.round(gameVolume * 100));
+  volumeSlider.setAttribute('aria-valuetext', `${Math.round(gameVolume * 100)}%`);
+  volumeControl.classList.toggle('is-muted', gameVolume === 0);
+  if (!persist) return;
+  try { window.localStorage.setItem(VOLUME_STORAGE_KEY, String(gameVolume)); } catch {}
+}
+
+volumeSlider.addEventListener('input', () => {
+  setGameVolume(Number(volumeSlider.value) / 100);
+});
+setGameVolume(gameVolume, false);
 
 const MAX_HEALTH = 100;
 const MAX_HUNGER = 10;
@@ -165,7 +213,10 @@ function scheduleNextCloudUpdate() {
 
 function toggleSettings() {
   const isOpen = document.body.classList.toggle('settings-open');
-  if (isOpen) setFeedingMode(false);
+  if (isOpen) {
+    setFeedingMode(false);
+    setInteractionMode(false);
+  }
   if (isOpen && clickTimer) {
     window.clearTimeout(clickTimer);
     clickTimer = undefined;
@@ -322,6 +373,7 @@ function releaseCapturedFoodPointer(pointerId) {
 
 function setFeedingMode(enabled) {
   if (enabled && (isSettingsOpen() || isDead || isDragging || isFalling)) return;
+  if (enabled) setInteractionMode(false);
   isFeedingMode = enabled;
   document.body.classList.toggle('feeding-mode', enabled);
   foodPicker.inert = !enabled;
@@ -348,6 +400,17 @@ function setFeedingMode(enabled) {
   foodCollectedDuringJump = false;
   resetMoralSoundSequence(true);
   pet.classList.remove('feeding-chasing', 'feeding-running-away', 'walking');
+}
+
+function setInteractionMode(enabled) {
+  if (enabled && (isSettingsOpen() || isDead || isFeedingMode)) return;
+  isInteractionMode = enabled;
+  document.body.classList.toggle('interaction-mode', enabled);
+  interactionPicker.inert = !enabled;
+  interactionPicker.setAttribute('aria-hidden', String(!enabled));
+  interactButton.setAttribute('aria-pressed', String(enabled));
+  interactButton.setAttribute('aria-label', enabled ? '結束互動選單' : '與企鵝互動');
+  interactButtonLabel.textContent = enabled ? '取消互動' : '互動';
 }
 
 function moveFoodWithPointer(event) {
@@ -735,7 +798,7 @@ function landingTop() {
 
 function loadSoundBuffer(sound) {
   if (!AudioContextClass) return Promise.resolve(null);
-  if (!audioContext) audioContext = new AudioContextClass();
+  ensureAudioGraph();
   if (!sound.bufferPromise) {
     sound.bufferPromise = fetch(sound.element.src, { cache: 'force-cache' })
       .then((response) => {
@@ -755,7 +818,7 @@ function loadSoundBuffer(sound) {
 function startSoundBuffer(sound, onEnded) {
   const source = audioContext.createBufferSource();
   source.buffer = sound.buffer;
-  source.connect(audioContext.destination);
+  source.connect(masterGainNode);
   sound.sources.add(source);
   source.addEventListener('ended', () => {
     sound.sources.delete(source);
@@ -781,13 +844,13 @@ function playSoundBuffer(sound, onEnded) {
 
 function primeAudioContext() {
   if (!AudioContextClass) return;
-  if (!audioContext) audioContext = new AudioContextClass();
+  ensureAudioGraph();
   audioContext.resume().catch(() => {});
   if (audioContextPrimed) return;
   const silentBuffer = audioContext.createBuffer(1, 1, audioContext.sampleRate);
   const silentSource = audioContext.createBufferSource();
   silentSource.buffer = silentBuffer;
-  silentSource.connect(audioContext.destination);
+  silentSource.connect(masterGainNode);
   silentSource.start(0);
   audioContextPrimed = true;
 }
@@ -1071,7 +1134,14 @@ scheduleWalk();
 // Game feature controls.
 feedButton.addEventListener('click', () => {
   if (isSettingsOpen() || isDead) return;
+  setInteractionMode(false);
   setFeedingMode(!isFeedingMode);
+});
+
+interactButton.addEventListener('click', () => {
+  if (isSettingsOpen() || isDead) return;
+  setFeedingMode(false);
+  setInteractionMode(!isInteractionMode);
 });
 
 foodPicker.querySelectorAll('[data-food-type]').forEach((button) => {
