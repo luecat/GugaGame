@@ -41,6 +41,9 @@ let foodGroundTimer;
 let feedingJumpActive = false;
 let foodCollectedDuringJump = false;
 let missedFeedingJumps = 0;
+let moralSoundHasPlayed = false;
+let moralSoundPlaying = false;
+let moralSoundPlaybackId = 0;
 let lastFeedingJumpAt = 0;
 const AudioContextClass = window.AudioContext || window.webkitAudioContext;
 let audioContext;
@@ -86,6 +89,8 @@ const MULTI_CLICK_DELAY = 500;
 const DEATH_NOTE_DURATION_MS = 3643;
 const FEEDING_TICK_MS = 120;
 const FEEDING_JUMP_COOLDOWN_MS = 800;
+const MORAL_SOUND_INITIAL_JUMPS = 3;
+const MORAL_SOUND_REPEAT_JUMPS = 2;
 const FEEDING_REACH_PADDING = 22;
 const FOOD_DRAG_START_DISTANCE = 7;
 const FOOD_EAT_DELAY_MS = 1000;
@@ -196,6 +201,14 @@ function renderAffection() {
   const fill = document.querySelector('.affection-fill');
   fill.style.width = `${affection}%`;
   meter.setAttribute('aria-label', `好感度：${affection}%`);
+}
+
+function resetMoralSoundSequence(stopPlayback = false) {
+  moralSoundPlaybackId += 1;
+  missedFeedingJumps = 0;
+  moralSoundHasPlayed = false;
+  moralSoundPlaying = false;
+  if (stopPlayback) stopSound(moralSound);
 }
 
 function removeActiveFood() {
@@ -311,9 +324,8 @@ function setFeedingMode(enabled) {
   pendingFoodDrag = null;
   feedingJumpActive = false;
   foodCollectedDuringJump = false;
-  missedFeedingJumps = 0;
+  resetMoralSoundSequence(true);
   pet.classList.remove('feeding-chasing', 'feeding-running-away', 'walking');
-  stopSound(moralSound);
 }
 
 function moveFoodWithPointer(event) {
@@ -358,7 +370,7 @@ function beginExistingFoodDrag(item, pointerId, clientX, clientY, captureTarget 
 
 function createDraggedFood(drag, event) {
   removeActiveFood();
-  missedFeedingJumps = 0;
+  resetMoralSoundSequence(true);
   const item = document.createElement('button');
   item.type = 'button';
   item.className = `feeding-item feeding-item-${drag.type}`;
@@ -467,7 +479,7 @@ function collectFood() {
   renderHunger();
   renderAffection();
   removeActiveFood();
-  missedFeedingJumps = 0;
+  resetMoralSoundSequence(true);
   pet.classList.remove('feeding-chasing', 'feeding-running-away', 'walking');
   return true;
 }
@@ -494,10 +506,19 @@ function startFeedingJump() {
   window.setTimeout(() => {
     feedingJumpActive = false;
     if (!isFeedingMode || !activeFood || foodCollectedDuringJump || Date.now() < activeFoodEdibleAt) return;
+    if (moralSoundPlaying) return;
     missedFeedingJumps += 1;
-    if (missedFeedingJumps < 3) return;
+    const jumpsRequired = moralSoundHasPlayed ? MORAL_SOUND_REPEAT_JUMPS : MORAL_SOUND_INITIAL_JUMPS;
+    if (missedFeedingJumps < jumpsRequired) return;
     missedFeedingJumps = 0;
-    playSound(moralSound);
+    moralSoundHasPlayed = true;
+    moralSoundPlaying = true;
+    const playbackId = ++moralSoundPlaybackId;
+    playSound(moralSound, () => {
+      if (playbackId !== moralSoundPlaybackId) return;
+      moralSoundPlaying = false;
+      missedFeedingJumps = 0;
+    });
   }, 640);
 }
 
@@ -654,27 +675,30 @@ function loadSoundBuffer(sound) {
   return sound.bufferPromise;
 }
 
-function startSoundBuffer(sound) {
+function startSoundBuffer(sound, onEnded) {
   const source = audioContext.createBufferSource();
   source.buffer = sound.buffer;
   source.connect(audioContext.destination);
   sound.sources.add(source);
-  source.addEventListener('ended', () => sound.sources.delete(source), { once: true });
+  source.addEventListener('ended', () => {
+    sound.sources.delete(source);
+    onEnded?.();
+  }, { once: true });
   source.start();
 }
 
-function playSoundBuffer(sound) {
+function playSoundBuffer(sound, onEnded) {
   if (!audioContext || !sound.buffer) return false;
   if (audioContext.state !== 'running') {
     audioContext.resume()
       .then(() => {
-        if (audioContext.state === 'running') startSoundBuffer(sound);
-        else playSoundFallback(sound);
+        if (audioContext.state === 'running') startSoundBuffer(sound, onEnded);
+        else playSoundFallback(sound, onEnded);
       })
-      .catch(() => playSoundFallback(sound));
+      .catch(() => playSoundFallback(sound, onEnded));
     return true;
   }
-  startSoundBuffer(sound);
+  startSoundBuffer(sound, onEnded);
   return true;
 }
 
@@ -731,22 +755,30 @@ function unlockGameSounds() {
 document.addEventListener('pointerdown', unlockGameSounds, { capture: true });
 document.addEventListener('touchstart', unlockGameSounds, { capture: true, passive: true });
 
-function playSoundFallback(sound) {
+function playSoundFallback(sound, onEnded) {
+  let completed = false;
+  const complete = () => {
+    if (completed) return;
+    completed = true;
+    sound.element.removeEventListener('ended', complete);
+    onEnded?.();
+  };
+  if (onEnded) sound.element.addEventListener('ended', complete, { once: true });
   sound.element.muted = false;
   sound.element.currentTime = 0;
-  sound.element.play().catch(() => {});
+  sound.element.play().catch(complete);
 }
 
-function playSound(sound) {
-  if (playSoundBuffer(sound)) return;
+function playSound(sound, onEnded) {
+  if (playSoundBuffer(sound, onEnded)) return;
   if (AudioContextClass) {
     loadSoundBuffer(sound).then((buffer) => {
-      if (buffer) playSoundBuffer(sound);
-      else playSoundFallback(sound);
+      if (buffer) playSoundBuffer(sound, onEnded);
+      else playSoundFallback(sound, onEnded);
     });
     return;
   }
-  playSoundFallback(sound);
+  playSoundFallback(sound, onEnded);
 }
 
 function playHurtSound() {
