@@ -11,7 +11,7 @@
     <meta property="og:description" content="Gugagame" />
     <meta property="og:type" content="website" />
     <title>Gugagame</title>
-    <link rel="stylesheet" href="style.css?v=20260802-24" />
+    <link rel="stylesheet" href="style.css?v=20260803-08" />
   </head>
   <body>
     <main class="world" aria-label="企鵝的草地">
@@ -54,7 +54,7 @@
       </aside>
       <div class="grass" aria-hidden="true"></div>
       <button id="pet" class="pet" aria-label="點擊企鵝讓牠跳躍">
-        <img src="assets/tuanzi-square.png" alt="企鵝" draggable="false" />
+        <img src="assets/gugugaga-white.png" alt="企鵝" draggable="false" />
       </button>
       <!-- DEBUG ONLY: This panel is deliberately separate from game controls. -->
       <section class="debug-panel" aria-label="調試專區">
@@ -66,10 +66,16 @@
         <button id="debug-death" type="button">死亡測試</button>
       </section>
       <section class="feature-panel" aria-label="功能專區">
-        <button id="feed-button" type="button" aria-label="餵食企鵝">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6c-4.6-4.3-9 0-9 5.5C3 17.4 8.2 21 12 22c3.8-1 9-4.6 9-10.5C21 6 16.6 1.7 12 6Z" /><path d="M12 6c-1.5-3 1-5 4-4" /></svg>
-          <span id="feed-button-label">餵食</span>
-        </button>
+        <div class="feature-actions">
+          <button id="feed-button" type="button" aria-label="餵食企鵝">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6c-4.6-4.3-9 0-9 5.5C3 17.4 8.2 21 12 22c3.8-1 9-4.6 9-10.5C21 6 16.6 1.7 12 6Z" /><path d="M12 6c-1.5-3 1-5 4-4" /></svg>
+            <span id="feed-button-label">餵食</span>
+          </button>
+          <button id="interact-button" type="button" aria-label="與企鵝互動">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5h16v11H9l-5 4v-15Z" /><path d="M8 10h8M8 13h5" /></svg>
+            <span>互動</span>
+          </button>
+        </div>
         <div id="food-picker" class="food-picker" aria-label="選擇食物" aria-hidden="true" inert>
           <button type="button" data-food-type="apple" aria-label="拖曳蘋果"><span class="food-art food-art-apple" aria-hidden="true"></span><span>蘋果</span></button>
           <button type="button" data-food-type="stone" aria-label="拖曳石頭"><span class="food-art food-art-stone" aria-hidden="true"></span><span>石頭</span></button>
@@ -77,12 +83,12 @@
       </section>
       <section id="death-screen" class="death-screen" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="death-title" inert>
         <div class="death-content">
-          <h1 id="death-title">你死了！</h1>
+          <h1 id="death-title">你死了</h1>
           <p id="death-cause">企鵝從太高的地方摔了下來</p>
           <button id="restart-button" type="button">重新開始</button>
         </div>
       </section>
     </main>
-    <script src="app.js?v=20260803-02"></script>
+    <script src="app.js?v=20260803-05"></script>
   </body>
 </html>
