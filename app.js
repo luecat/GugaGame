@@ -27,6 +27,11 @@ const rpsPicker = document.querySelector('#rps-picker');
 const endRpsButton = document.querySelector('#end-rps-button');
 const rpsResult = document.querySelector('#rps-result');
 const rpsChoiceButtons = rpsPicker.querySelectorAll('[data-rps-choice]');
+const ballButton = document.querySelector('#ball-button');
+const ballGame = document.querySelector('#ball-game');
+const ballCourt = document.querySelector('#ball-court');
+const ballGameStatus = document.querySelector('#ball-game-status');
+const closeBallGameButton = document.querySelector('#close-ball-game');
 const themeColorMeta = document.querySelector('meta[name="theme-color"]');
 const hungerMeter = document.querySelector('.hunger');
 const hungerFill = document.querySelector('.hunger-fill');
@@ -54,6 +59,7 @@ let isInteractionMode = false;
 let isSingingMode = false;
 let isRpsMode = false;
 let isRpsResolving = false;
+let isBallMode = false;
 let penguinWinStreak = 0;
 let rpsDisabledControls = null;
 let rpsResultResetTimer;
@@ -305,6 +311,7 @@ function toggleSettings() {
     setInteractionMode(false);
     setSingingMode(false);
     setRpsMode(false);
+    setBallMode(false);
   }
   if (isOpen && clickTimer) {
     window.clearTimeout(clickTimer);
@@ -451,6 +458,7 @@ function releaseCapturedFoodPointer(pointerId) {
 
 function setFeedingMode(enabled) {
   if (enabled && (isSettingsOpen() || isDead || isDragging || isFalling)) return;
+  if (enabled) setBallMode(false);
   if (enabled) setInteractionMode(false);
   if (enabled) setSingingMode(false);
   isFeedingMode = enabled;
@@ -484,7 +492,7 @@ function setFeedingMode(enabled) {
 }
 
 function setInteractionMode(enabled) {
-  if (enabled && (isSettingsOpen() || isDead || isFeedingMode || isRpsMode || isRpsResolving)) return;
+  if (enabled && (isSettingsOpen() || isDead || isFeedingMode || isRpsMode || isRpsResolving || isBallMode)) return;
   if (enabled) setSingingMode(false);
   isInteractionMode = enabled;
   document.body.classList.toggle('interaction-mode', enabled);
@@ -496,7 +504,7 @@ function setInteractionMode(enabled) {
 }
 
 function setRpsMode(enabled) {
-  if (enabled && (isSettingsOpen() || isDead || isFeedingMode || isSingingMode || isRpsResolving)) return;
+  if (enabled && (isSettingsOpen() || isDead || isFeedingMode || isSingingMode || isRpsResolving || isBallMode)) return;
   isRpsMode = enabled;
   document.body.classList.toggle('rps-mode', enabled);
   rpsPicker.inert = !enabled;
@@ -662,6 +670,136 @@ function playSingingSong() {
   stopSound(singingSound);
   playSound(singingSound);
 }
+
+// A compact canvas game keeps the court responsive without adding another character system.
+const ballPlay = {
+  width: 0, height: 0, playerX: .5, penguinX: .5,
+  ballX: .5, ballY: .64, velocityX: .22, velocityY: -.42,
+  pausedUntil: 0, swingUntil: 0, frame: undefined, lastTime: 0,
+};
+
+function resizeBallCourt() {
+  const rect = ballCourt.getBoundingClientRect();
+  const ratio = Math.min(window.devicePixelRatio || 1, 2);
+  ballCourt.width = Math.max(1, Math.round(rect.width * ratio));
+  ballCourt.height = Math.max(1, Math.round(rect.height * ratio));
+  ballPlay.width = rect.width;
+  ballPlay.height = rect.height;
+  ballCourt.getContext('2d').setTransform(ratio, 0, 0, ratio, 0, 0);
+}
+
+function ballCourtEdge(y) {
+  // Keep the same side margin from top to bottom: a rectangle, not perspective.
+  return ballPlay.width * .04;
+}
+
+function resetBallServe(direction = Math.random() < .5 ? -1 : 1) {
+  ballPlay.ballX = ballPlay.width * .5;
+  ballPlay.ballY = ballPlay.height * .62;
+  ballPlay.velocityX = direction * (.16 + Math.random() * .08);
+  ballPlay.velocityY = -.43;
+  ballGameStatus.textContent = '接住球！';
+}
+
+function drawBallCourt() {
+  const ctx = ballCourt.getContext('2d');
+  const { width: w, height: h } = ballPlay;
+  if (!w || !h) return;
+  ctx.clearRect(0, 0, w, h);
+  const topEdge = ballCourtEdge(0), bottomEdge = ballCourtEdge(h);
+  ctx.fillStyle = '#71c981';
+  ctx.fillRect(0, 0, w, h);
+  ctx.beginPath();
+  ctx.moveTo(topEdge, 0); ctx.lineTo(w - topEdge, 0); ctx.lineTo(w - bottomEdge, h); ctx.lineTo(bottomEdge, h); ctx.closePath();
+  ctx.fillStyle = '#8ddd91'; ctx.fill();
+  ctx.strokeStyle = '#f8fff3'; ctx.lineWidth = Math.max(2, w * .005); ctx.lineJoin = 'round'; ctx.stroke();
+  const netY = h * .48;
+  const netInset = ballCourtEdge(netY);
+  ctx.strokeStyle = '#f5fff5'; ctx.lineWidth = Math.max(3, w * .007);
+  ctx.beginPath(); ctx.moveTo(netInset, netY); ctx.lineTo(w - netInset, netY); ctx.stroke();
+  ctx.strokeStyle = '#e0f1d9aa'; ctx.lineWidth = 1;
+  for (let x = netInset; x < w - netInset; x += Math.max(12, w * .035)) { ctx.beginPath(); ctx.moveTo(x, netY); ctx.lineTo(x, netY + h * .07); ctx.stroke(); }
+  for (let y = netY + h * .018; y < netY + h * .07; y += Math.max(8, h * .018)) { ctx.beginPath(); ctx.moveTo(netInset, y); ctx.lineTo(w - netInset, y); ctx.stroke(); }
+
+  const penguinY = h * .18, penguinSize = Math.min(w, h) * .095;
+  ctx.save(); ctx.translate(ballPlay.penguinX, penguinY);
+  // Reuse the scene's real penguin artwork so the mini-game stays in the same style.
+  const penguinArtSize = penguinSize * 2.25;
+  ctx.drawImage(petImage, -penguinArtSize / 2, -penguinArtSize * .62, penguinArtSize, penguinArtSize);
+  const swing = Math.max(0, Math.min(1, (ballPlay.swingUntil - performance.now()) / 180));
+  ctx.rotate((1 - swing) * .38 - .1);
+  ctx.strokeStyle = '#9c5c40'; ctx.lineWidth = Math.max(3, penguinSize * .12); ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(penguinSize * .43, penguinSize * .12); ctx.lineTo(penguinSize * .83, -penguinSize * .22); ctx.stroke();
+  ctx.restore();
+
+  const playerY = h * .89, paddleW = Math.min(w * .25, h * .34), paddleH = Math.max(10, h * .026);
+  ctx.fillStyle = '#ec765f'; ctx.beginPath(); ctx.roundRect(ballPlay.playerX - paddleW / 2, playerY - paddleH / 2, paddleW, paddleH, paddleH); ctx.fill();
+  const ballRadius = Math.max(11, w * .022);
+  ctx.fillStyle = '#fff3d9'; ctx.beginPath(); ctx.ellipse(ballPlay.ballX, ballPlay.ballY, ballRadius, ballRadius, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#e5a84b'; ctx.lineWidth = 2; ctx.stroke();
+}
+
+function ballGameFrame(now) {
+  if (!isBallMode) return;
+  const dt = Math.min(.035, Math.max(0, (now - ballPlay.lastTime) / 1000 || 0));
+  ballPlay.lastTime = now;
+  const { width: w, height: h } = ballPlay;
+  if (now >= ballPlay.pausedUntil) {
+    const penguinTarget = Math.max(ballCourtEdge(h * .18) + 18, Math.min(w - ballCourtEdge(h * .18) - 18, ballPlay.ballX));
+    ballPlay.penguinX += (penguinTarget - ballPlay.penguinX) * Math.min(1, dt * 4.5);
+    ballPlay.ballX += ballPlay.velocityX * w * dt;
+    ballPlay.ballY += ballPlay.velocityY * h * dt;
+    const edge = ballCourtEdge(ballPlay.ballY), radius = Math.max(11, w * .022);
+    if (ballPlay.ballX - radius < edge || ballPlay.ballX + radius > w - edge) {
+      ballPlay.ballX = Math.max(edge + radius, Math.min(w - edge - radius, ballPlay.ballX));
+      ballPlay.velocityX *= -1;
+    }
+    const playerY = h * .89, paddleW = Math.min(w * .25, h * .34), paddleH = Math.max(10, h * .026);
+    if (ballPlay.velocityY > 0 && ballPlay.ballY + radius >= playerY - paddleH / 2 && ballPlay.ballY - radius <= playerY + paddleH / 2 && Math.abs(ballPlay.ballX - ballPlay.playerX) < paddleW / 2 + radius) {
+      ballPlay.ballY = playerY - paddleH / 2 - radius;
+      ballPlay.velocityY = -Math.abs(ballPlay.velocityY) * 1.035;
+      ballPlay.velocityX += ((ballPlay.ballX - ballPlay.playerX) / (paddleW / 2)) * .18;
+      ballPlay.velocityX = Math.max(-.45, Math.min(.45, ballPlay.velocityX));
+    }
+    const penguinY = h * .18, penguinReach = Math.min(w * .14, h * .18);
+    if (ballPlay.velocityY < 0 && ballPlay.ballY <= penguinY + penguinReach && ballPlay.ballY >= penguinY - penguinReach && Math.abs(ballPlay.ballX - ballPlay.penguinX) < penguinReach) {
+      ballPlay.ballY = penguinY + penguinReach;
+      ballPlay.velocityY = Math.abs(ballPlay.velocityY) * 1.025;
+      ballPlay.velocityX += ((ballPlay.ballX - ballPlay.penguinX) / penguinReach) * .12;
+      ballPlay.swingUntil = now + 180;
+      ballGameStatus.textContent = '企鵝擊球！';
+    }
+    if (ballPlay.ballY > h + radius * 2) {
+      ballGameStatus.textContent = '漏接了，再來一次！';
+      ballPlay.pausedUntil = now + 850;
+      window.setTimeout(() => { if (isBallMode) resetBallServe(); }, 850);
+    }
+  }
+  drawBallCourt();
+  ballPlay.frame = window.requestAnimationFrame(ballGameFrame);
+}
+
+function setBallMode(enabled) {
+  if (enabled && (isSettingsOpen() || isDead || isFeedingMode || isRpsResolving)) return;
+  isBallMode = enabled;
+  document.body.classList.toggle('ball-mode', enabled);
+  ballGame.inert = !enabled;
+  ballGame.setAttribute('aria-hidden', String(!enabled));
+  if (!enabled) { window.cancelAnimationFrame(ballPlay.frame); ballPlay.frame = undefined; return; }
+  setInteractionMode(false); setSingingMode(false); setRpsMode(false);
+  walking = false; pet.classList.remove('walking');
+  resizeBallCourt();
+  ballPlay.playerX = ballPlay.width * .5; ballPlay.penguinX = ballPlay.width * .5; ballPlay.pausedUntil = 0;
+  resetBallServe(); ballPlay.lastTime = performance.now(); ballPlay.frame = window.requestAnimationFrame(ballGameFrame);
+}
+
+function moveBallPaddle(clientX) {
+  const rect = ballCourt.getBoundingClientRect();
+  ballPlay.playerX = Math.max(ballCourtEdge(ballPlay.height) + 12, Math.min(ballPlay.width - ballCourtEdge(ballPlay.height) - 12, clientX - rect.left));
+}
+
+ballCourt.addEventListener('pointerdown', (event) => { event.preventDefault(); moveBallPaddle(event.clientX); ballCourt.setPointerCapture?.(event.pointerId); });
+ballCourt.addEventListener('pointermove', (event) => { if (isBallMode) { event.preventDefault(); moveBallPaddle(event.clientX); } });
+window.addEventListener('resize', () => { if (isBallMode) { resizeBallCourt(); resetBallServe(); } });
 
 function moveFoodWithPointer(event) {
   if (pendingFoodDrag?.pointerId === event.pointerId) {
@@ -1460,6 +1598,8 @@ singingButton.addEventListener('click', () => {
 });
 
 rpsButton.addEventListener('click', () => setRpsMode(true));
+ballButton.addEventListener('click', () => setBallMode(true));
+closeBallGameButton.addEventListener('click', () => setBallMode(false));
 endRpsButton.addEventListener('click', () => {
   if (!isRpsResolving) setRpsMode(false);
 });

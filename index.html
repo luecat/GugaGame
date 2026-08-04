@@ -12,7 +12,7 @@
     <meta property="og:type" content="website" />
     <title>Gugagame</title>
     <link rel="preload" as="image" href="image/gugugaga-sing.png?v=20260803-13" />
-    <link rel="stylesheet" href="style.css?v=20260804-rps4" />
+    <link rel="stylesheet" href="style.css?v=20260804-ball4" />
   </head>
   <body>
     <main class="world" aria-label="企鵝的草地">
@@ -104,7 +104,7 @@
         </div>
         <div id="interaction-picker" class="interaction-picker" aria-label="選擇互動" aria-hidden="true" inert>
           <button id="singing-button" type="button">唱歌</button>
-          <button type="button">玩球</button>
+          <button id="ball-button" type="button">玩球</button>
           <button id="rps-button" type="button">猜拳</button>
           <button type="button">捉迷藏</button>
           <button type="button">音遊</button>
@@ -123,6 +123,14 @@
         </div>
       </section>
       <p id="rps-result" class="rps-result" aria-live="polite" aria-hidden="true">選一個出拳吧</p>
+      <section id="ball-game" class="ball-game" aria-label="和企鵝玩球" aria-hidden="true" inert>
+        <div class="ball-game-bar">
+          <button id="close-ball-game" type="button" aria-label="結束玩球">結束</button>
+        </div>
+        <span id="ball-game-status" class="ball-game-status" aria-live="polite">接住球！</span>
+        <canvas id="ball-court" aria-label="玩球場地：移動球拍接住球"></canvas>
+        <p class="ball-game-hint">滑鼠或手指左右移動球拍</p>
+      </section>
       <section id="death-screen" class="death-screen" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="death-title" inert>
         <div class="death-content">
           <h1 id="death-title">你死了</h1>
@@ -131,6 +139,6 @@
         </div>
       </section>
     </main>
-    <script src="app.js?v=20260804-rps3"></script>
+    <script src="app.js?v=20260804-ball5"></script>
   </body>
 </html>
