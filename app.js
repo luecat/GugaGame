@@ -49,6 +49,7 @@ let isRpsMode = false;
 let isRpsResolving = false;
 let penguinWinStreak = 0;
 let rpsDisabledControls = null;
+let rpsResultResetTimer;
 const normalPetImageSource = petImage.getAttribute('src');
 const singingPetImageSource = new URL('image/gugugaga-sing.png?v=20260803-13', document.baseURI).href;
 const RPS_PENGUIN_IMAGES = {
@@ -500,9 +501,13 @@ function setRpsMode(enabled) {
     setInteractionMode(false);
     walking = false;
     pet.classList.remove('walking');
+    petImage.src = normalPetImageSource;
+    petImage.alt = '企鵝';
     rpsResult.textContent = '選一個出拳吧';
     unlockGameSounds();
   } else {
+    window.clearTimeout(rpsResultResetTimer);
+    rpsResultResetTimer = undefined;
     petImage.src = normalPetImageSource;
     petImage.alt = '企鵝';
     rpsResult.textContent = '選一個出拳吧';
@@ -541,6 +546,8 @@ function playSoundAndWait(sound) {
 
 async function playRpsRound(userHand) {
   if (!isRpsMode || isRpsResolving || isDead) return;
+  window.clearTimeout(rpsResultResetTimer);
+  rpsResultResetTimer = undefined;
   const shouldUserWin = penguinWinStreak >= 3 || Math.floor(Math.random() * 10) % 2 === 0;
   const penguinHand = shouldUserWin ? RPS_LOSING_HAND[userHand] : RPS_WINNING_HAND[userHand];
   const resultText = shouldUserWin ? '你贏了！' : '企鵝贏了！';
@@ -549,7 +556,13 @@ async function playRpsRound(userHand) {
   pet.classList.remove('rps-user-win', 'rps-penguin-win');
   petImage.src = RPS_PENGUIN_IMAGES[penguinHand];
   petImage.alt = `企鵝出了${RPS_HAND_NAMES[penguinHand]}`;
-  rpsResult.textContent = `你出${RPS_HAND_NAMES[userHand]}，企鵝出${RPS_HAND_NAMES[penguinHand]}。${resultText}`;
+  rpsResult.innerHTML = `你出${RPS_HAND_NAMES[userHand]}，企鵝出${RPS_HAND_NAMES[penguinHand]}。${shouldUserWin ? '<strong class="rps-user-result">你贏了！</strong>' : resultText}`;
+  rpsResultResetTimer = window.setTimeout(() => {
+    rpsResult.textContent = '選一個出拳吧';
+    petImage.src = normalPetImageSource;
+    petImage.alt = '企鵝';
+    rpsResultResetTimer = undefined;
+  }, 2000);
   void pet.offsetWidth;
 
   const animationClass = shouldUserWin ? 'rps-user-win' : 'rps-penguin-win';
