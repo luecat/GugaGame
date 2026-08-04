@@ -62,6 +62,7 @@ let isRpsMode = false;
 let isRpsResolving = false;
 let isBallMode = false;
 let ballCombo = 0;
+const BALL_PLAYER_Y = .80;
 let penguinWinStreak = 0;
 let rpsDisabledControls = null;
 let rpsResultResetTimer;
@@ -737,7 +738,7 @@ function drawBallCourt() {
   ctx.strokeStyle = '#9c5c40'; ctx.lineWidth = Math.max(3, penguinSize * .12); ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(penguinSize * .43, penguinSize * .12); ctx.lineTo(penguinSize * .83, -penguinSize * .22); ctx.stroke();
   ctx.restore();
 
-  const playerY = h * .89, paddleW = Math.min(w * .25, h * .34), paddleH = Math.max(10, h * .026);
+  const playerY = h * BALL_PLAYER_Y, paddleW = Math.min(w * .25, h * .34), paddleH = Math.max(10, h * .026);
   ctx.fillStyle = '#ec765f';
   ctx.beginPath();
   if (typeof ctx.roundRect === 'function') {
@@ -766,7 +767,7 @@ function ballGameFrame(now) {
       ballPlay.ballX = Math.max(edge + radius, Math.min(w - edge - radius, ballPlay.ballX));
       ballPlay.velocityX *= -1;
     }
-    const playerY = h * .89, paddleW = Math.min(w * .25, h * .34), paddleH = Math.max(10, h * .026);
+    const playerY = h * BALL_PLAYER_Y, paddleW = Math.min(w * .25, h * .34), paddleH = Math.max(10, h * .026);
     if (ballPlay.velocityY > 0 && ballPlay.ballY + radius >= playerY - paddleH / 2 && ballPlay.ballY - radius <= playerY + paddleH / 2 && Math.abs(ballPlay.ballX - ballPlay.playerX) < paddleW / 2 + radius) {
       ballPlay.ballY = playerY - paddleH / 2 - radius;
       ballPlay.velocityY = -Math.abs(ballPlay.velocityY) * 1.035;
