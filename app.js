@@ -732,7 +732,14 @@ function drawBallCourt() {
   ctx.restore();
 
   const playerY = h * .89, paddleW = Math.min(w * .25, h * .34), paddleH = Math.max(10, h * .026);
-  ctx.fillStyle = '#ec765f'; ctx.beginPath(); ctx.roundRect(ballPlay.playerX - paddleW / 2, playerY - paddleH / 2, paddleW, paddleH, paddleH); ctx.fill();
+  ctx.fillStyle = '#ec765f';
+  ctx.beginPath();
+  if (typeof ctx.roundRect === 'function') {
+    ctx.roundRect(ballPlay.playerX - paddleW / 2, playerY - paddleH / 2, paddleW, paddleH, paddleH);
+  } else {
+    ctx.rect(ballPlay.playerX - paddleW / 2, playerY - paddleH / 2, paddleW, paddleH);
+  }
+  ctx.fill();
   const ballRadius = Math.max(11, w * .022);
   ctx.fillStyle = '#fff3d9'; ctx.beginPath(); ctx.ellipse(ballPlay.ballX, ballPlay.ballY, ballRadius, ballRadius, 0, 0, Math.PI * 2); ctx.fill();
   ctx.strokeStyle = '#e5a84b'; ctx.lineWidth = 2; ctx.stroke();
@@ -782,7 +789,8 @@ function setBallMode(enabled) {
   if (enabled && (isSettingsOpen() || isDead || isFeedingMode || isRpsResolving)) return;
   isBallMode = enabled;
   document.body.classList.toggle('ball-mode', enabled);
-  ballGame.inert = !enabled;
+  if (enabled) ballGame.removeAttribute('inert');
+  else ballGame.setAttribute('inert', '');
   ballGame.setAttribute('aria-hidden', String(!enabled));
   if (!enabled) { window.cancelAnimationFrame(ballPlay.frame); ballPlay.frame = undefined; return; }
   setInteractionMode(false); setSingingMode(false); setRpsMode(false);
@@ -1603,11 +1611,11 @@ function openBallGame(event) {
   setBallMode(true);
 }
 ballButton.addEventListener('click', openBallGame);
-// Some mobile browsers do not always synthesize a click for this menu button.
-ballButton.addEventListener('pointerup', (event) => {
+// Start on press: mobile Safari may lose the release event when the menu closes.
+ballButton.addEventListener('pointerdown', (event) => {
   if (event.pointerType !== 'mouse') openBallGame(event);
 });
-ballButton.addEventListener('touchend', openBallGame, { passive: false });
+ballButton.addEventListener('touchstart', openBallGame, { passive: false });
 closeBallGameButton.addEventListener('click', () => setBallMode(false));
 endRpsButton.addEventListener('click', () => {
   if (!isRpsResolving) setRpsMode(false);
