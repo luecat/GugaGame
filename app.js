@@ -70,6 +70,42 @@ let genshinSoundPending = false;
 let genshinSoundPlayed = false;
 let lockedCloudCount = null;
 const VOLUME_STORAGE_KEY = 'gugagame-web-volume';
+const FOOD_STORAGE_KEY = 'gugagame-food-inventory';
+const FOOD_MAX_QUANTITY = 99;
+const FOOD_TYPES = ['apple', 'stone'];
+
+function readFoodInventory() {
+  const defaults = Object.fromEntries(FOOD_TYPES.map((type) => [type, FOOD_MAX_QUANTITY]));
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(FOOD_STORAGE_KEY) || 'null');
+    if (!stored || typeof stored !== 'object') return defaults;
+    return Object.fromEntries(FOOD_TYPES.map((type) => {
+      const value = Number(stored[type]);
+      return [type, Number.isFinite(value) ? Math.max(0, Math.min(FOOD_MAX_QUANTITY, Math.floor(value))) : FOOD_MAX_QUANTITY];
+    }));
+  } catch {
+    return defaults;
+  }
+}
+
+let foodInventory = readFoodInventory();
+
+function saveFoodInventory() {
+  try {
+    window.localStorage.setItem(FOOD_STORAGE_KEY, JSON.stringify(foodInventory));
+  } catch {}
+}
+
+function updateFoodPicker() {
+  foodPicker.querySelectorAll('[data-food-type]').forEach((button) => {
+    const type = button.dataset.foodType;
+    const quantity = foodInventory[type] ?? 0;
+    const label = button.querySelector('.food-quantity');
+    if (label) label.textContent = `×${quantity}`;
+    button.disabled = quantity <= 0;
+    button.setAttribute('aria-label', `${type === 'apple' ? '蘋果' : '石頭'}，剩餘 ${quantity} 個`);
+  });
+}
 
 function readSavedVolume() {
   try {
@@ -337,14 +373,9 @@ function cancelFoodFall() {
 function landFood(food) {
   if (activeFood !== food) return;
   foodFallFrame = undefined;
-  food.classList.remove('falling');
-  food.classList.add('landed');
-  const lifetime = food.dataset.foodType === 'stone'
-    ? STONE_GROUND_LIFETIME_MS
-    : FOOD_GROUND_FADE_DELAY_MS + FOOD_GROUND_FADE_DURATION_MS;
-  foodGroundTimer = window.setTimeout(() => {
-    if (activeFood === food && foodDragPointerId === null) removeActiveFood();
-  }, lifetime);
+  // Food is only interactable while held above the grass. Once it lands, remove
+  // it before the feeding loop can make the penguin chase it across the ground.
+  removeActiveFood();
 }
 
 function startFoodFall() {
@@ -561,6 +592,7 @@ function beginExistingFoodDrag(item, pointerId, clientX, clientY, captureTarget 
 }
 
 function createDraggedFood(drag, event) {
+  if ((foodInventory[drag.type] ?? 0) <= 0) return;
   removeActiveFood();
   resetMoralSoundSequence(true);
   const item = document.createElement('button');
@@ -597,7 +629,7 @@ function createDraggedFood(drag, event) {
 }
 
 function beginFoodDrag(type, source, pointerId, clientX, clientY) {
-  if (!isFeedingMode || isSettingsOpen() || isDead) return;
+  if (!isFeedingMode || isSettingsOpen() || isDead || (foodInventory[type] ?? 0) <= 0) return;
   unlockGameSounds();
   const artRect = source.querySelector('.food-art').getBoundingClientRect();
   pendingFoodDrag = {
@@ -665,6 +697,11 @@ document.addEventListener('touchcancel', releaseFoodTouch, { passive: false });
 function collectFood() {
   if (!activeFood) return false;
   const isStone = activeFood.dataset.foodType === 'stone';
+  const foodType = activeFood.dataset.foodType;
+  if ((foodInventory[foodType] ?? 0) <= 0) return false;
+  foodInventory[foodType] -= 1;
+  saveFoodInventory();
+  updateFoodPicker();
   foodCollectedDuringJump = feedingJumpActive;
   hunger = Math.min(MAX_HUNGER, hunger + (isStone ? STONE_HUNGER_GAIN : FEED_HUNGER_GAIN));
   affection = Math.min(MAX_AFFECTION, affection + (isStone ? STONE_AFFECTION_GAIN : FEED_AFFECTION_GAIN));
@@ -1284,6 +1321,7 @@ foodPicker.querySelectorAll('[data-food-type]').forEach((button) => {
   button.addEventListener('pointerdown', (event) => prepareFoodPointerDrag(button.dataset.foodType, event));
   button.addEventListener('touchstart', (event) => prepareFoodTouchDrag(button.dataset.foodType, event), { passive: false });
 });
+updateFoodPicker();
 
 // ===== DEBUG ONLY — isolated visual-preview control; not part of game behaviour. =====
 (() => {
@@ -1292,6 +1330,10 @@ foodPicker.querySelectorAll('[data-food-type]').forEach((button) => {
   const debugFullHungerButton = document.querySelector('#debug-full-hunger');
   const debugCloudCountButton = document.querySelector('#debug-cloud-count');
   const debugDeathButton = document.querySelector('#debug-death');
+  const debugFoodType = document.querySelector('#debug-food-type');
+  const debugFoodAmount = document.querySelector('#debug-food-amount');
+  const debugFoodApplyButton = document.querySelector('#debug-food-apply');
+  const debugFoodClearButton = document.querySelector('#debug-food-clear');
   let previewNight = document.body.classList.contains('is-night');
   debugButton.addEventListener('click', () => {
     previewNight = !previewNight;
@@ -1319,6 +1361,19 @@ foodPicker.querySelectorAll('[data-food-type]').forEach((button) => {
     health = 0;
     renderHealth();
     triggerDeath('調試專區觸發了死亡');
+  });
+  debugFoodApplyButton.addEventListener('click', () => {
+    const amount = Number.parseInt(debugFoodAmount.value.trim(), 10);
+    if (!Number.isInteger(amount) || amount === 0) return;
+    const type = debugFoodType.value;
+    foodInventory[type] = Math.max(0, Math.min(FOOD_MAX_QUANTITY, foodInventory[type] + amount));
+    saveFoodInventory();
+    updateFoodPicker();
+  });
+  debugFoodClearButton.addEventListener('click', () => {
+    foodInventory[debugFoodType.value] = 0;
+    saveFoodInventory();
+    updateFoodPicker();
   });
 })();
 
