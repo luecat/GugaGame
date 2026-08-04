@@ -1598,7 +1598,16 @@ singingButton.addEventListener('click', () => {
 });
 
 rpsButton.addEventListener('click', () => setRpsMode(true));
-ballButton.addEventListener('click', () => setBallMode(true));
+function openBallGame(event) {
+  if (event?.cancelable) event.preventDefault();
+  setBallMode(true);
+}
+ballButton.addEventListener('click', openBallGame);
+// Some mobile browsers do not always synthesize a click for this menu button.
+ballButton.addEventListener('pointerup', (event) => {
+  if (event.pointerType !== 'mouse') openBallGame(event);
+});
+ballButton.addEventListener('touchend', openBallGame, { passive: false });
 closeBallGameButton.addEventListener('click', () => setBallMode(false));
 endRpsButton.addEventListener('click', () => {
   if (!isRpsResolving) setRpsMode(false);
