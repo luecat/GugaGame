@@ -27,6 +27,13 @@ const rpsPicker = document.querySelector('#rps-picker');
 const endRpsButton = document.querySelector('#end-rps-button');
 const rpsResult = document.querySelector('#rps-result');
 const rpsChoiceButtons = rpsPicker.querySelectorAll('[data-rps-choice]');
+const themeColorMeta = document.querySelector('meta[name="theme-color"]');
+const hungerMeter = document.querySelector('.hunger');
+const hungerFill = document.querySelector('.hunger-fill');
+const healthMeter = document.querySelector('.health');
+const healthFill = document.querySelector('.health-fill');
+const affectionMeter = document.querySelector('.affection');
+const affectionFill = document.querySelector('.affection-fill');
 let position = 42;
 let walking = false;
 let clickTimer;
@@ -79,6 +86,8 @@ let stoneGreetingFood = null;
 let stoneGreetingCompletedFood = null;
 let stoneGreetingTimer;
 let lastFeedingJumpAt = 0;
+let feedingBehaviorTimer;
+let walkTimer;
 const AudioContextClass = window.AudioContext || window.webkitAudioContext;
 let audioContext;
 let masterGainNode;
@@ -321,30 +330,24 @@ function updateDayNightFromBrowserTime() {
   const hour = new Date().getHours();
   const isNight = hour < 6 || hour >= 18;
   document.body.classList.toggle('is-night', isNight);
-  document.querySelector('meta[name="theme-color"]').content = isNight ? '#263f76' : '#80d2ef';
+  themeColorMeta.content = isNight ? '#263f76' : '#80d2ef';
 }
 
 function renderHunger() {
-  const meter = document.querySelector('.hunger');
-  const fill = document.querySelector('.hunger-fill');
   const percentage = (hunger / MAX_HUNGER) * 100;
-  fill.style.width = `${percentage}%`;
-  meter.setAttribute('aria-label', `飽食度：${percentage}%`);
+  hungerFill.style.width = `${percentage}%`;
+  hungerMeter.setAttribute('aria-label', `飽食度：${percentage}%`);
 }
 
 function renderHealth() {
-  const meter = document.querySelector('.health');
-  const fill = document.querySelector('.health-fill');
   const percentage = (health / MAX_HEALTH) * 100;
-  fill.style.width = `${percentage}%`;
-  meter.setAttribute('aria-label', `血量：${percentage}%`);
+  healthFill.style.width = `${percentage}%`;
+  healthMeter.setAttribute('aria-label', `血量：${percentage}%`);
 }
 
 function renderAffection() {
-  const meter = document.querySelector('.affection');
-  const fill = document.querySelector('.affection-fill');
-  fill.style.width = `${affection}%`;
-  meter.setAttribute('aria-label', `好感度：${affection}%`);
+  affectionFill.style.width = `${affection}%`;
+  affectionMeter.setAttribute('aria-label', `好感度：${affection}%`);
 }
 
 function resetMoralSoundSequence(stopPlayback = false) {
@@ -467,9 +470,11 @@ function setFeedingMode(enabled) {
     walking = false;
     pet.classList.remove('walking');
     unlockGameSounds();
+    startFeedingBehaviorLoop();
     return;
   }
 
+  stopFeedingBehaviorLoop();
   removeActiveFood();
   pendingFoodDrag = null;
   feedingJumpActive = false;
@@ -962,6 +967,17 @@ function updateFeedingBehavior() {
   if (foodY < standingReachY) startFeedingJump();
 }
 
+function startFeedingBehaviorLoop() {
+  if (feedingBehaviorTimer !== undefined || document.hidden) return;
+  feedingBehaviorTimer = window.setInterval(updateFeedingBehavior, FEEDING_TICK_MS);
+}
+
+function stopFeedingBehaviorLoop() {
+  if (feedingBehaviorTimer === undefined) return;
+  window.clearInterval(feedingBehaviorTimer);
+  feedingBehaviorTimer = undefined;
+}
+
 function movePenguin() {
   if (isFeedingMode || isSingingMode || isRpsMode || isRpsResolving || isSettingsOpen() || isDead || isDragging || isFalling || pet.classList.contains('jumping') || pet.classList.contains('crazy-flying')) return;
   const maxPosition = Math.max(8, ((window.innerWidth - pet.offsetWidth) / window.innerWidth) * 100);
@@ -976,10 +992,18 @@ function movePenguin() {
 }
 
 function scheduleWalk() {
-  window.setTimeout(() => {
+  if (document.hidden || walkTimer !== undefined) return;
+  walkTimer = window.setTimeout(() => {
+    walkTimer = undefined;
     movePenguin();
     scheduleWalk();
   }, 1800 + Math.random() * 3600);
+}
+
+function stopScheduledWalk() {
+  if (walkTimer === undefined) return;
+  window.clearTimeout(walkTimer);
+  walkTimer = undefined;
 }
 
 function jump() {
@@ -1135,6 +1159,10 @@ function unlockSound(sound) {
 }
 
 function unlockGameSounds() {
+  if (gameAudioActivated) {
+    if (audioContext?.state === 'suspended') audioContext.resume().catch(() => {});
+    return;
+  }
   gameAudioActivated = true;
   unlockSound(hurtSound);
   unlockSound(landingSound);
@@ -1400,8 +1428,18 @@ updateCloudsFromClock();
 window.setInterval(updateDayNightFromBrowserTime, 60_000);
 scheduleNextCloudUpdate();
 window.setInterval(healFromFullHunger, FULL_HUNGER_HEAL_INTERVAL);
-window.setInterval(updateFeedingBehavior, FEEDING_TICK_MS);
 scheduleWalk();
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    stopFeedingBehaviorLoop();
+    stopScheduledWalk();
+    return;
+  }
+  updateDayNightFromBrowserTime();
+  if (isFeedingMode) startFeedingBehaviorLoop();
+  scheduleWalk();
+});
 
 // Game feature controls.
 feedButton.addEventListener('click', () => {
