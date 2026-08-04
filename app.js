@@ -22,6 +22,11 @@ const singingButton = document.querySelector('#singing-button');
 const singingPicker = document.querySelector('#singing-picker');
 const cancelSingingButton = document.querySelector('#cancel-singing-button');
 const singingSongButton = document.querySelector('#singing-song-button');
+const rpsButton = document.querySelector('#rps-button');
+const rpsPicker = document.querySelector('#rps-picker');
+const endRpsButton = document.querySelector('#end-rps-button');
+const rpsResult = document.querySelector('#rps-result');
+const rpsChoiceButtons = rpsPicker.querySelectorAll('[data-rps-choice]');
 let position = 42;
 let walking = false;
 let clickTimer;
@@ -40,8 +45,20 @@ let petStartTop = 0;
 let isFeedingMode = false;
 let isInteractionMode = false;
 let isSingingMode = false;
+let isRpsMode = false;
+let isRpsResolving = false;
+let penguinWinStreak = 0;
+let rpsDisabledControls = null;
 const normalPetImageSource = petImage.getAttribute('src');
 const singingPetImageSource = new URL('image/gugugaga-sing.png?v=20260803-13', document.baseURI).href;
+const RPS_PENGUIN_IMAGES = {
+  scissors: new URL('image/gugugaga-剪刀.png', document.baseURI).href,
+  rock: new URL('image/gugugaga-石頭.png', document.baseURI).href,
+  paper: new URL('image/gugugaga-布.png', document.baseURI).href,
+};
+const RPS_HAND_NAMES = { scissors: '剪刀', rock: '石頭', paper: '布' };
+const RPS_LOSING_HAND = { scissors: 'paper', rock: 'scissors', paper: 'rock' };
+const RPS_WINNING_HAND = { scissors: 'rock', rock: 'paper', paper: 'scissors' };
 let activeFood = null;
 let foodDragOffsetX = 0;
 let foodDragOffsetY = 0;
@@ -133,7 +150,8 @@ const deathNoteSound = createSound('audio/死亡筆記本.wav');
 const moralSound = createSound('audio/做事要講良心.wav');
 const genshinSound = createSound('audio/好想玩原神.wav');
 const singingSound = createSound('audio/壱雫空.wav');
-const gameSounds = [hurtSound, landingSound, screamSound, deathSound, deathNoteSound, moralSound, genshinSound, singingSound];
+const penguinWinSound = createSound('audio/gugugaga.wav');
+const gameSounds = [hurtSound, landingSound, screamSound, deathSound, deathNoteSound, moralSound, genshinSound, singingSound, penguinWinSound];
 const SINGING_WAVEFORM_FPS = 20;
 const SINGING_WAVEFORM = Uint8Array.of(42,44,54,56,58,62,60,60,63,68,69,69,86,80,72,66,68,70,70,70,70,72,69,43,4,59,62,65,63,59,53,70,71,68,57,16,70,100,89,85,92,82,87,100,77,85,86,82,85,100,83,89,84,66,77,99,95,93,89,76,85,100,79,92,80,73,90,100,100,89,88,86,92,91,74,88,77,74,97,99,98,92,84,87,100,91,87,91,84,81,100,88,93,86,87,85,99,84,88,87,70,80,100,99,97,85,81,85,99,81,92,85,80,83,100,98,95,91,85,94,97,78,89,77,72,94,98,100,88,80,69,97,89,88,83,76,74,100,97,100,87,81,88,100,79,91,76,72,86,100,100,95,84,76,92,97,83,92,82,79,98,99,99,93,79,83,95,93,80,87,83,89,99,99,97,84,73,81,92,95,77,89,87,85,96,99,95,95,84,83,98,87,83,95,87,92,83,90,84,100,100,100,89,86,91,96,78,89,99,74,93,78,76,87,96,84,92,98,68,89,82,81,86,78,76,96,94,87,96,99,90,91,81,75,91,83,90,100,77,83,100,87,86,89,82,78,83,82,87,97,90,92,100,73,88,82,82,84,83,82,90,96,80,87,99,71,92,85,72,85,75,75,98,94,80,93,98,80,99,76,77,81,81,84,98,83,80,99,85,88,89,85,83,84,84,88,98,83,84,99,81,90,86,81,85,98,96,96,93,79,100,98,96,94,79,81,82,80,80,90,86,84,82,86,77,90,76,74,95,91,79,92,82,83,99,81,82,90,82,84,100,80,88,84,84,82,81,76,74,91,72,88,92,70,83,84,81,89,99,76,85,82,78,87,99,78,88,86,80,83,74,91,85,79,69,82,89,83,90,86,86,89,85,85,87,84,85,95,93,85,96,92,90,89,88,80,84,68,42,71,54,52,60,62,63,60,39,47,58,15,62,65,68,73,69,65,69,69,66,67,67,65,93,90,75,91,73,70,92,70,76,90,76,75);
 const SINGING_BEATS = [[.07,.34],[.61,.27],[1.26,.83],[1.57,.48],[1.83,.74],[2.28,.95],[3.04,.64],[3.47,1],[3.76,.8],[4.62,.52],[4.94,.8],[5.14,.53],[5.82,.73],[6.26,.62],[6.95,.56],[7.28,.84],[7.57,.61],[7.87,.74],[8.37,.58],[8.58,.7],[8.94,.7],[9.31,.55],[9.55,.66],[9.79,.65],[10.53,1],[10.85,.99],[11.26,.82],[11.45,.78],[11.99,.93],[12.43,.71],[12.73,1],[13.03,.92],[13.32,1],[13.9,1],[14.49,.94],[14.99,.62],[15.24,.75],[15.51,.76],[15.96,1],[16.42,.77],[16.82,.52],[17.13,.52],[17.59,.7],[17.89,.83],[18.32,.85],[18.55,.79],[19.06,.74],[19.49,.88],[19.76,.48],[19.95,.83],[20.52,.61],[21.11,1],[21.41,1]];
@@ -213,7 +231,7 @@ function isSettingsOpen() {
 }
 
 function canPlayGenshinSound() {
-  return walking && !isSettingsOpen() && !isFeedingMode && !isSingingMode && !isDead && !isDragging && !isFalling;
+  return walking && !isSettingsOpen() && !isFeedingMode && !isSingingMode && !isRpsMode && !isRpsResolving && !isDead && !isDragging && !isFalling;
 }
 
 function maybePlayGenshinSound(count) {
@@ -276,6 +294,7 @@ function toggleSettings() {
     setFeedingMode(false);
     setInteractionMode(false);
     setSingingMode(false);
+    setRpsMode(false);
   }
   if (isOpen && clickTimer) {
     window.clearTimeout(clickTimer);
@@ -459,7 +478,7 @@ function setFeedingMode(enabled) {
 }
 
 function setInteractionMode(enabled) {
-  if (enabled && (isSettingsOpen() || isDead || isFeedingMode)) return;
+  if (enabled && (isSettingsOpen() || isDead || isFeedingMode || isRpsMode || isRpsResolving)) return;
   if (enabled) setSingingMode(false);
   isInteractionMode = enabled;
   document.body.classList.toggle('interaction-mode', enabled);
@@ -468,6 +487,82 @@ function setInteractionMode(enabled) {
   interactButton.setAttribute('aria-pressed', String(enabled));
   interactButton.setAttribute('aria-label', enabled ? '結束互動選單' : '與企鵝互動');
   interactButtonLabel.textContent = enabled ? '取消互動' : '互動';
+}
+
+function setRpsMode(enabled) {
+  if (enabled && (isSettingsOpen() || isDead || isFeedingMode || isSingingMode || isRpsResolving)) return;
+  isRpsMode = enabled;
+  document.body.classList.toggle('rps-mode', enabled);
+  rpsPicker.inert = !enabled;
+  rpsPicker.setAttribute('aria-hidden', String(!enabled));
+  rpsResult.setAttribute('aria-hidden', String(!enabled));
+  if (enabled) {
+    setInteractionMode(false);
+    walking = false;
+    pet.classList.remove('walking');
+    rpsResult.textContent = '選一個出拳吧';
+    unlockGameSounds();
+  } else {
+    petImage.src = normalPetImageSource;
+    petImage.alt = '企鵝';
+    rpsResult.textContent = '選一個出拳吧';
+  }
+}
+
+function setRpsPlaybackLock(locked) {
+  isRpsResolving = locked;
+  document.body.classList.toggle('rps-resolving', locked);
+  if (locked) {
+    rpsDisabledControls = new Map();
+    document.querySelectorAll('button, input, select').forEach((control) => {
+      rpsDisabledControls.set(control, control.disabled);
+      control.disabled = true;
+    });
+    return;
+  }
+  rpsDisabledControls?.forEach((wasDisabled, control) => { control.disabled = wasDisabled; });
+  rpsDisabledControls = null;
+}
+
+function waitForAnimation(element, animationName) {
+  return new Promise((resolve) => {
+    const finish = (event) => {
+      if (event && (event.target !== element || event.animationName !== animationName)) return;
+      element.removeEventListener('animationend', finish);
+      resolve();
+    };
+    element.addEventListener('animationend', finish);
+  });
+}
+
+function playSoundAndWait(sound) {
+  return new Promise((resolve) => playSound(sound, resolve));
+}
+
+async function playRpsRound(userHand) {
+  if (!isRpsMode || isRpsResolving || isDead) return;
+  const shouldUserWin = penguinWinStreak >= 3 || Math.floor(Math.random() * 10) % 2 === 0;
+  const penguinHand = shouldUserWin ? RPS_LOSING_HAND[userHand] : RPS_WINNING_HAND[userHand];
+  const resultText = shouldUserWin ? '你贏了！' : '企鵝贏了！';
+
+  setRpsPlaybackLock(true);
+  pet.classList.remove('rps-user-win', 'rps-penguin-win');
+  petImage.src = RPS_PENGUIN_IMAGES[penguinHand];
+  petImage.alt = `企鵝出了${RPS_HAND_NAMES[penguinHand]}`;
+  rpsResult.textContent = `你出${RPS_HAND_NAMES[userHand]}，企鵝出${RPS_HAND_NAMES[penguinHand]}。${resultText}`;
+  void pet.offsetWidth;
+
+  const animationClass = shouldUserWin ? 'rps-user-win' : 'rps-penguin-win';
+  const animationName = shouldUserWin ? 'rps-disappointed-shake' : 'rps-victory-shake';
+  pet.classList.add(animationClass);
+  await Promise.all([
+    waitForAnimation(pet, animationName),
+    playSoundAndWait(shouldUserWin ? screamSound : penguinWinSound),
+  ]);
+  pet.classList.remove(animationClass);
+  if (shouldUserWin) penguinWinStreak = 0;
+  else penguinWinStreak += 1;
+  setRpsPlaybackLock(false);
 }
 
 function stopSingingWaveAnimation() {
@@ -855,7 +950,7 @@ function updateFeedingBehavior() {
 }
 
 function movePenguin() {
-  if (isFeedingMode || isSingingMode || isSettingsOpen() || isDead || isDragging || isFalling || pet.classList.contains('jumping') || pet.classList.contains('crazy-flying')) return;
+  if (isFeedingMode || isSingingMode || isRpsMode || isRpsResolving || isSettingsOpen() || isDead || isDragging || isFalling || pet.classList.contains('jumping') || pet.classList.contains('crazy-flying')) return;
   const maxPosition = Math.max(8, ((window.innerWidth - pet.offsetWidth) / window.innerWidth) * 100);
   const next = Math.round(4 + Math.random() * Math.max(0, maxPosition - 8));
   pet.classList.toggle('facing-left', next < position);
@@ -875,7 +970,7 @@ function scheduleWalk() {
 }
 
 function jump() {
-  if (isSettingsOpen() || isDead || isDragging || isFalling || pet.classList.contains('jumping')) return;
+  if (isRpsMode || isRpsResolving || isSettingsOpen() || isDead || isDragging || isFalling || pet.classList.contains('jumping')) return;
   pet.classList.remove('walking');
   pet.classList.add('jumping');
   window.setTimeout(() => {
@@ -886,14 +981,14 @@ function jump() {
 }
 
 function spin() {
-  if (isSettingsOpen() || isDead || isDragging || isFalling || pet.classList.contains('crazy-flying')) return;
+  if (isRpsMode || isRpsResolving || isSettingsOpen() || isDead || isDragging || isFalling || pet.classList.contains('crazy-flying')) return;
   pet.classList.remove('walking');
   pet.classList.add('spinning');
   window.setTimeout(() => pet.classList.remove('spinning'), 720);
 }
 
 function crazyFly() {
-  if (isSettingsOpen() || isDead || isDragging || isFalling) return;
+  if (isRpsMode || isRpsResolving || isSettingsOpen() || isDead || isDragging || isFalling) return;
   walking = false;
   pet.classList.remove('walking', 'facing-left', 'jumping', 'spinning', 'crazy-flying');
   pet.style.setProperty('--crazy-x1', `${Math.round(-38 + Math.random() * 24)}vw`);
@@ -913,7 +1008,7 @@ function crazyFly() {
 }
 
 pet.addEventListener('click', (event) => {
-  if (isFeedingMode || isSingingMode || isSettingsOpen() || isDead) return;
+  if (isFeedingMode || isSingingMode || isRpsMode || isRpsResolving || isSettingsOpen() || isDead) return;
   if (suppressNextClick) {
     suppressNextClick = false;
     return;
@@ -1036,6 +1131,7 @@ function unlockGameSounds() {
   unlockSound(moralSound);
   unlockSound(genshinSound);
   unlockSound(singingSound);
+  unlockSound(penguinWinSound);
   if (genshinSoundPending && canPlayGenshinSound()) {
     genshinSoundPending = false;
     genshinSoundPlayed = true;
@@ -1111,6 +1207,7 @@ function triggerDeath(cause = '企鵝失去了所有血量') {
   isDead = true;
   setFeedingMode(false);
   setSingingMode(false);
+  setRpsMode(false);
   isDragging = false;
   isFalling = false;
   walking = false;
@@ -1233,7 +1330,7 @@ function healFromFullHunger() {
 }
 
 pet.addEventListener('pointerdown', (event) => {
-  if (isFeedingMode || isSingingMode || isSettingsOpen() || isDead || isFalling || pet.classList.contains('jumping') || pet.classList.contains('spinning') || pet.classList.contains('crazy-flying')) return;
+  if (isFeedingMode || isSingingMode || isRpsMode || isRpsResolving || isSettingsOpen() || isDead || isFalling || pet.classList.contains('jumping') || pet.classList.contains('spinning') || pet.classList.contains('crazy-flying')) return;
   unlockGameSounds();
   const rect = pet.getBoundingClientRect();
   dragStartX = event.clientX;
@@ -1295,13 +1392,13 @@ scheduleWalk();
 
 // Game feature controls.
 feedButton.addEventListener('click', () => {
-  if (isSettingsOpen() || isDead) return;
+  if (isSettingsOpen() || isDead || isRpsResolving) return;
   setInteractionMode(false);
   setFeedingMode(!isFeedingMode);
 });
 
 interactButton.addEventListener('click', () => {
-  if (isSettingsOpen() || isDead) return;
+  if (isSettingsOpen() || isDead || isRpsResolving) return;
   setFeedingMode(false);
   setInteractionMode(!isInteractionMode);
 });
@@ -1309,6 +1406,14 @@ interactButton.addEventListener('click', () => {
 singingButton.addEventListener('click', () => {
   setInteractionMode(false);
   setSingingMode(true);
+});
+
+rpsButton.addEventListener('click', () => setRpsMode(true));
+endRpsButton.addEventListener('click', () => {
+  if (!isRpsResolving) setRpsMode(false);
+});
+rpsChoiceButtons.forEach((button) => {
+  button.addEventListener('click', () => playRpsRound(button.dataset.rpsChoice));
 });
 
 cancelSingingButton.addEventListener('click', () => {
