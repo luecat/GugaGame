@@ -41,7 +41,7 @@ let isFeedingMode = false;
 let isInteractionMode = false;
 let isSingingMode = false;
 const normalPetImageSource = petImage.getAttribute('src');
-const singingPetImageSource = new URL('assets/gugugaga-sing.png?v=20260803-13', document.baseURI).href;
+const singingPetImageSource = new URL('image/gugugaga-sing.png?v=20260803-13', document.baseURI).href;
 let activeFood = null;
 let foodDragOffsetX = 0;
 let foodDragOffsetY = 0;
