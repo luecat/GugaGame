@@ -32,6 +32,7 @@ const ballGame = document.querySelector('#ball-game');
 const ballCourt = document.querySelector('#ball-court');
 const ballGameStatus = document.querySelector('#ball-game-status');
 const closeBallGameButton = document.querySelector('#close-ball-game');
+const ballComboValue = document.querySelector('#ball-combo-value');
 const themeColorMeta = document.querySelector('meta[name="theme-color"]');
 const hungerMeter = document.querySelector('.hunger');
 const hungerFill = document.querySelector('.hunger-fill');
@@ -60,6 +61,7 @@ let isSingingMode = false;
 let isRpsMode = false;
 let isRpsResolving = false;
 let isBallMode = false;
+let ballCombo = 0;
 let penguinWinStreak = 0;
 let rpsDisabledControls = null;
 let rpsResultResetTimer;
@@ -247,7 +249,7 @@ function isSettingsOpen() {
 }
 
 function canPlayGenshinSound() {
-  return walking && !isSettingsOpen() && !isFeedingMode && !isSingingMode && !isRpsMode && !isRpsResolving && !isDead && !isDragging && !isFalling;
+  return walking && !isSettingsOpen() && !isFeedingMode && !isInteractionMode && !isSingingMode && !isRpsMode && !isRpsResolving && !isBallMode && !isDead && !isDragging && !isFalling;
 }
 
 function maybePlayGenshinSound(count) {
@@ -283,6 +285,10 @@ function renderClouds(count) {
 }
 
 function playGenshinSoundWithCloudLock(count = cloudLayer.childElementCount) {
+  if (!canPlayGenshinSound()) {
+    genshinSoundPending = false;
+    return;
+  }
   lockedCloudCount = count;
   playSound(genshinSound, () => {
     lockedCloudCount = null;
@@ -766,6 +772,8 @@ function ballGameFrame(now) {
       ballPlay.velocityY = -Math.abs(ballPlay.velocityY) * 1.035;
       ballPlay.velocityX += ((ballPlay.ballX - ballPlay.playerX) / (paddleW / 2)) * .18;
       ballPlay.velocityX = Math.max(-.45, Math.min(.45, ballPlay.velocityX));
+      ballCombo += 1;
+      ballComboValue.textContent = String(ballCombo);
     }
     const penguinY = h * .18, penguinReach = Math.min(w * .14, h * .18);
     if (ballPlay.velocityY < 0 && ballPlay.ballY <= penguinY + penguinReach && ballPlay.ballY >= penguinY - penguinReach && Math.abs(ballPlay.ballX - ballPlay.penguinX) < penguinReach) {
@@ -776,6 +784,8 @@ function ballGameFrame(now) {
       ballGameStatus.textContent = '企鵝擊球！';
     }
     if (ballPlay.ballY > h + radius * 2) {
+      ballCombo = 0;
+      ballComboValue.textContent = '0';
       ballGameStatus.textContent = '漏接了，再來一次！';
       ballPlay.pausedUntil = now + 850;
       window.setTimeout(() => { if (isBallMode) resetBallServe(); }, 850);
@@ -797,6 +807,10 @@ function setBallMode(enabled) {
   walking = false; pet.classList.remove('walking');
   resizeBallCourt();
   ballPlay.playerX = ballPlay.width * .5; ballPlay.penguinX = ballPlay.width * .5; ballPlay.pausedUntil = 0;
+  stopSound(genshinSound);
+  genshinSoundPending = false;
+  ballCombo = 0;
+  ballComboValue.textContent = '0';
   resetBallServe(); ballPlay.lastTime = performance.now(); ballPlay.frame = window.requestAnimationFrame(ballGameFrame);
 }
 

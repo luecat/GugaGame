@@ -95,6 +95,8 @@ body.rps-mode .rps-picker { display: grid; }
 body.rps-mode .rps-result { visibility: visible; opacity: 1; transition-delay: 0s; }
 .ball-game { position: fixed; z-index: 70; inset: 0; display: block; visibility: hidden; opacity: 0; pointer-events: none; background: #71c981; transition: opacity .2s ease, visibility 0s linear .2s; touch-action: none; }
 body.ball-mode .ball-game { visibility: visible; opacity: 1; pointer-events: auto; transition-delay: 0s; }
+.ball-combo { position: absolute; z-index: 1; top: max(16px, env(safe-area-inset-top)); left: max(16px, env(safe-area-inset-left)); padding: 10px 14px; border-radius: 10px; background: #ffffffc4; color: #38515b; font-size: clamp(15px, 2.8vw, 21px); font-weight: 900; text-shadow: 0 1px #fff; }
+.ball-combo strong { color: #b45b5b; font-size: 1.15em; }
 .ball-game-bar { position: absolute; z-index: 1; right: max(16px, env(safe-area-inset-right)); bottom: max(16px, env(safe-area-inset-bottom)); display: grid; place-items: center; width: clamp(100px, 12vw, 118px); height: clamp(68px, 8.5vw, 78px); padding: 12px; border-radius: 12px; background: #ffffffc4; }
 .ball-game-bar button { width: 100%; min-height: 40px; padding: 6px 8px; border: 0; border-radius: 6px; background: #b45b5b; color: #fff; font: inherit; font-weight: 800; cursor: pointer; touch-action: manipulation; }
 .ball-game-bar button:focus-visible { outline: 3px solid #274f60; outline-offset: 3px; }
