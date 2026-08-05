@@ -43,6 +43,18 @@ const catchPenguin = document.querySelector('#catch-penguin');
 const closeCatchGameButton = document.querySelector('#close-catch-game');
 const catchApples = document.querySelector('#catch-apples');
 const catchStones = document.querySelector('#catch-stones');
+const hideAndSeekButton = document.querySelector('#hide-and-seek-button');
+const hideAndSeekGame = document.querySelector('#hide-and-seek-game');
+const hideGameBoard = document.querySelector('#hide-game-board');
+const hideGameIntro = document.querySelector('#hide-game-intro');
+const hideGameSpots = document.querySelector('#hide-game-spots');
+const hidePenguin = document.querySelector('#hide-penguin');
+const hidePenguinHit = document.querySelector('#hide-penguin-hit');
+const startHideGameButton = document.querySelector('#start-hide-game');
+const closeHideGameButton = document.querySelector('#close-hide-game');
+const hideGameTimer = document.querySelector('#hide-game-timer');
+const hideGameResult = document.querySelector('#hide-game-result');
+const hideGameBlackout = document.querySelector('#hide-game-blackout');
 const themeColorMeta = document.querySelector('meta[name="theme-color"]');
 const hungerMeter = document.querySelector('.hunger');
 const hungerFill = document.querySelector('.hunger-fill');
@@ -80,6 +92,12 @@ let catchStonesCount = 0;
 const catchItems = new Set();
 const catchGameState = { lastTime: 0, penguinX: .5 };
 let catchControlPointerId = null;
+let isHideAndSeekMode = false;
+let isHideAndSeekRunning = false;
+let hideGameRevealTimer;
+let hideGameCountdownTimer;
+let hideGameTimeout;
+let hideGameNextRoundTimer;
 let ballCombo = 0;
 const BALL_PLAYER_Y = .80;
 let penguinWinStreak = 0;
@@ -527,7 +545,7 @@ function setFeedingMode(enabled) {
 }
 
 function setInteractionMode(enabled) {
-  if (enabled && (isSettingsOpen() || isDead || isFeedingMode || isRpsMode || isRpsResolving || isBallMode)) return;
+  if (enabled && (isSettingsOpen() || isDead || isFeedingMode || isRpsMode || isRpsResolving || isBallMode || isHideAndSeekMode)) return;
   if (enabled) setSingingMode(false);
   isInteractionMode = enabled;
   document.body.classList.toggle('interaction-mode', enabled);
@@ -539,7 +557,7 @@ function setInteractionMode(enabled) {
 }
 
 function setRpsMode(enabled) {
-  if (enabled && (isSettingsOpen() || isDead || isFeedingMode || isSingingMode || isRpsResolving || isBallMode)) return;
+  if (enabled && (isSettingsOpen() || isDead || isFeedingMode || isSingingMode || isRpsResolving || isBallMode || isHideAndSeekMode)) return;
   isRpsMode = enabled;
   document.body.classList.toggle('rps-mode', enabled);
   rpsPicker.inert = !enabled;
@@ -825,7 +843,7 @@ function ballGameFrame(now) {
 }
 
 function setBallMode(enabled) {
-  if (enabled && (isSettingsOpen() || isDead || isFeedingMode || isRpsResolving)) return;
+  if (enabled && (isSettingsOpen() || isDead || isFeedingMode || isRpsResolving || isHideAndSeekMode)) return;
   isBallMode = enabled;
   document.body.classList.toggle('ball-mode', enabled);
   if (enabled) ballGame.removeAttribute('inert');
@@ -1017,6 +1035,132 @@ document.addEventListener('keydown', (event) => {
   const current = catchPenguin.getBoundingClientRect().left + catchPenguin.offsetWidth / 2;
   moveCatchPenguin(current + (event.key === 'ArrowLeft' ? -48 : 48));
 });
+const HIDE_GAME_SPOTS = [
+  [15, 28, 82, 'boulder'], [37, 21, 94, 'bush'], [65, 28, 90, 'boulder'],
+  [84, 20, 80, 'boulder'], [23, 58, 94, 'bush'], [49, 53, 108, 'hut'],
+  [77, 58, 92, 'boulder'], [12, 82, 84, 'boulder'], [63, 81, 96, 'bush'], [89, 79, 78, 'boulder'],
+];
+
+function renderHideGameSpots() {
+  hideGameSpots.replaceChildren(...HIDE_GAME_SPOTS.map(([x, y, size, type]) => {
+    const spot = document.createElement('div');
+    spot.className = `hide-spot ${type}`;
+    spot.style.setProperty('--spot-x', `${x}%`);
+    spot.style.setProperty('--spot-y', `${y}%`);
+    spot.style.setProperty('--spot-size', `${size}px`);
+    return spot;
+  }));
+}
+
+function clearHideGameTimers() {
+  window.clearTimeout(hideGameRevealTimer);
+  window.clearTimeout(hideGameTimeout);
+  window.clearTimeout(hideGameNextRoundTimer);
+  window.clearInterval(hideGameCountdownTimer);
+  hideGameRevealTimer = undefined;
+  hideGameTimeout = undefined;
+  hideGameNextRoundTimer = undefined;
+  hideGameCountdownTimer = undefined;
+}
+
+function resetHideGameBoard() {
+  clearHideGameTimers();
+  isHideAndSeekRunning = false;
+  hideGameIntro.hidden = false;
+  startHideGameButton.textContent = '開始遊戲';
+  hideGameTimer.textContent = '找到企鵝！';
+  hideGameBlackout.setAttribute('aria-hidden', 'true');
+  hidePenguin.disabled = true;
+  hidePenguinHit.disabled = true;
+  hidePenguinHit.classList.remove('is-visible');
+  hidePenguin.classList.remove('is-visible', 'hide-penguin-victory', 'hide-penguin-shocked');
+  hideGameResult.textContent = '';
+  hideGameResult.classList.remove('is-visible', 'is-lost');
+}
+
+function setHideAndSeekMode(enabled) {
+  if (enabled && (isSettingsOpen() || isDead || isRpsResolving)) return;
+  isHideAndSeekMode = enabled;
+  document.body.classList.toggle('hide-and-seek-mode', enabled);
+  if (enabled) hideAndSeekGame.removeAttribute('inert');
+  else hideAndSeekGame.setAttribute('inert', '');
+  hideAndSeekGame.setAttribute('aria-hidden', String(!enabled));
+  if (!enabled) {
+    resetHideGameBoard();
+    return;
+  }
+  setInteractionMode(false);
+  setFeedingMode(false);
+  setSingingMode(false);
+  setRpsMode(false);
+  walking = false;
+  pet.classList.remove('walking');
+  unlockGameSounds();
+  resetHideGameBoard();
+}
+
+function beginHideAndSeekRound() {
+  if (!isHideAndSeekMode || isHideAndSeekRunning || isDead) return;
+  clearHideGameTimers();
+  const [x, y, size] = HIDE_GAME_SPOTS[Math.floor(Math.random() * HIDE_GAME_SPOTS.length)];
+  const hideDepth = .18 + Math.random() * .24;
+  const sideOffset = (Math.random() - .5) * size * .24;
+  hideGameIntro.hidden = true;
+  hideGameResult.textContent = '';
+  hideGameResult.classList.remove('is-visible', 'is-lost');
+  hidePenguin.style.left = `calc(${x}% + ${Math.round(sideOffset)}px)`;
+  hidePenguin.style.top = `calc(${y}% - ${Math.round(size * hideDepth)}px)`;
+  hidePenguinHit.style.left = hidePenguin.style.left;
+  hidePenguinHit.style.top = hidePenguin.style.top;
+  hidePenguin.disabled = true;
+  hidePenguinHit.disabled = true;
+  hidePenguinHit.classList.remove('is-visible');
+  hidePenguin.classList.remove('is-visible', 'hide-penguin-victory', 'hide-penguin-shocked');
+  hideGameTimer.textContent = '企鵝正在躲起來…';
+  hideGameBlackout.setAttribute('aria-hidden', 'false');
+  hideGameRevealTimer = window.setTimeout(() => {
+    if (!isHideAndSeekMode || isDead) return;
+    isHideAndSeekRunning = true;
+    const deadline = Date.now() + 20_000;
+    hideGameBlackout.setAttribute('aria-hidden', 'true');
+    hidePenguin.disabled = false;
+    hidePenguin.classList.add('is-visible');
+    hidePenguinHit.disabled = false;
+    hidePenguinHit.classList.add('is-visible');
+    const updateTimer = () => {
+      const remaining = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+      hideGameTimer.textContent = `剩下 ${remaining} 秒`;
+    };
+    updateTimer();
+    hideGameCountdownTimer = window.setInterval(updateTimer, 250);
+    hideGameTimeout = window.setTimeout(() => finishHideAndSeekRound(false), 20_000);
+  }, 3000);
+}
+
+function finishHideAndSeekRound(userWon) {
+  if (!isHideAndSeekMode || !isHideAndSeekRunning) return;
+  isHideAndSeekRunning = false;
+  clearHideGameTimers();
+  hidePenguin.disabled = true;
+  hidePenguinHit.disabled = true;
+  hidePenguinHit.classList.remove('is-visible');
+  hidePenguin.classList.add('is-visible');
+  hidePenguin.classList.remove('hide-penguin-victory', 'hide-penguin-shocked');
+  void hidePenguin.offsetWidth;
+  hidePenguin.classList.add(userWon ? 'hide-penguin-shocked' : 'hide-penguin-victory');
+  hideGameTimer.textContent = userWon ? '你找到企鵝了！' : '時間到！';
+  hideGameResult.textContent = userWon ? 'YOU WIN' : 'YOU LOST';
+  hideGameResult.classList.toggle('is-lost', !userWon);
+  hideGameResult.classList.add('is-visible');
+  if (userWon) playSound(screamSound);
+  else playSound(penguinWinSound);
+  hideGameIntro.hidden = true;
+  hideGameNextRoundTimer = window.setTimeout(() => {
+    if (isHideAndSeekMode && !isDead) beginHideAndSeekRound();
+  }, 2500);
+}
+
+renderHideGameSpots();
 
 function moveFoodWithPointer(event) {
   if (pendingFoodDrag?.pointerId === event.pointerId) {
@@ -1601,6 +1745,7 @@ function stopSound(sound) {
 function triggerDeath(cause = '企鵝失去了所有血量') {
   if (isDead) return;
   isDead = true;
+  setHideAndSeekMode(false);
   setFeedingMode(false);
   setSingingMode(false);
   setRpsMode(false);
@@ -1638,6 +1783,7 @@ function triggerDeath(cause = '企鵝失去了所有血量') {
 }
 
 function restartGame() {
+  setHideAndSeekMode(false);
   setFeedingMode(false);
   setSingingMode(false);
   isDead = false;
@@ -1726,7 +1872,7 @@ function healFromFullHunger() {
 }
 
 pet.addEventListener('pointerdown', (event) => {
-  if (isFeedingMode || isSingingMode || isRpsMode || isRpsResolving || isSettingsOpen() || isDead || isFalling || pet.classList.contains('jumping') || pet.classList.contains('spinning') || pet.classList.contains('crazy-flying')) return;
+  if (isFeedingMode || isSingingMode || isRpsMode || isRpsResolving || isHideAndSeekMode || isSettingsOpen() || isDead || isFalling || pet.classList.contains('jumping') || pet.classList.contains('spinning') || pet.classList.contains('crazy-flying')) return;
   unlockGameSounds();
   const rect = pet.getBoundingClientRect();
   dragStartX = event.clientX;
@@ -1833,6 +1979,7 @@ singingButton.addEventListener('click', () => {
 });
 
 rpsButton.addEventListener('click', () => setRpsMode(true));
+hideAndSeekButton.addEventListener('click', () => setHideAndSeekMode(true));
 function openBallGame(event) {
   if (event?.cancelable) event.preventDefault();
   setBallMode(true);
@@ -1844,6 +1991,10 @@ ballButton.addEventListener('pointerdown', (event) => {
 });
 ballButton.addEventListener('touchstart', openBallGame, { passive: false });
 closeBallGameButton.addEventListener('click', () => setBallMode(false));
+closeHideGameButton.addEventListener('click', () => setHideAndSeekMode(false));
+startHideGameButton.addEventListener('click', beginHideAndSeekRound);
+hidePenguin.addEventListener('click', () => finishHideAndSeekRound(true));
+hidePenguinHit.addEventListener('click', () => finishHideAndSeekRound(true));
 endRpsButton.addEventListener('click', () => {
   if (!isRpsResolving) setRpsMode(false);
 });
