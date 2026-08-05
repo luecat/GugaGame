@@ -34,6 +34,7 @@ const ballGameStatus = document.querySelector('#ball-game-status');
 const closeBallGameButton = document.querySelector('#close-ball-game');
 const ballComboValue = document.querySelector('#ball-combo-value');
 const hideAndSeekButton = document.querySelector('#hide-and-seek-button');
+const rhythmGameButton = document.querySelector('#rhythm-game-button');
 const hideAndSeekGame = document.querySelector('#hide-and-seek-game');
 const hideGameBoard = document.querySelector('#hide-game-board');
 const hideGameIntro = document.querySelector('#hide-game-intro');
@@ -1777,6 +1778,7 @@ singingButton.addEventListener('click', () => {
 
 rpsButton.addEventListener('click', () => setRpsMode(true));
 hideAndSeekButton.addEventListener('click', () => setHideAndSeekMode(true));
+rhythmGameButton.addEventListener('click', () => { window.location.href = 'scp-game.html'; });
 function openBallGame(event) {
   if (event?.cancelable) event.preventDefault();
   setBallMode(true);

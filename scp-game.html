@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark only" />
+    <meta name="theme-color" content="#101827" />
+    <title>GugaGame SCP 音遊</title>
+    <link rel="stylesheet" href="scp-game.css" />
+  </head>
+  <body>
+    <main id="game-shell" class="game-shell">
+      <canvas id="game-canvas" aria-label="SCP 音遊軌道"></canvas>
+
+      <section id="setup-panel" class="setup-panel" aria-labelledby="setup-title">
+        <a href="index.html" class="back-link">← 回到 GugaGame</a>
+        <p class="eyebrow">Sonolus Collection Player</p>
+        <h1 id="setup-title">載入 SCP，直接遊玩</h1>
+        <p class="intro">譜面與音樂只會在瀏覽器內解開，不會上傳。支援多點觸控，以及鍵盤 S D F J K L。</p>
+
+        <label class="file-button">
+          <span>選擇 .scp 檔案</span>
+          <input id="scp-file" type="file" accept=".scp,application/zip" />
+        </label>
+        <p id="load-status" class="load-status" aria-live="polite">尚未選擇譜面</p>
+
+        <article id="track-card" class="track-card" hidden>
+          <img id="track-cover" alt="" />
+          <div>
+            <p id="track-level" class="eyebrow"></p>
+            <h2 id="track-title"></h2>
+            <p id="track-credit"></p>
+            <p id="track-notes"></p>
+          </div>
+        </article>
+
+        <div id="play-settings" class="play-settings" hidden>
+          <label>流速 <output id="speed-output">7</output>
+            <input id="speed-slider" type="range" min="1" max="10" step="1" value="7" />
+          </label>
+          <label>判定偏移 <output id="offset-output">0 ms</output>
+            <input id="offset-slider" type="range" min="-250" max="250" step="5" value="0" />
+          </label>
+        </div>
+        <button id="start-game" class="start-button" type="button" disabled>開始遊戲</button>
+      </section>
+
+      <section id="game-hud" class="game-hud" aria-label="遊戲狀態" hidden>
+        <div><span>SCORE</span><strong id="score-value">0000000</strong></div>
+        <div class="combo"><span>COMBO</span><strong id="combo-value">0</strong></div>
+        <div><span>LIFE</span><strong id="life-value">100</strong></div>
+      </section>
+      <div id="judgment" class="judgment" aria-live="off"></div>
+      <div id="ready-message" class="ready-message" aria-hidden="true">READY</div>
+
+      <div id="game-controls" class="game-controls" hidden>
+        <button id="pause-game" type="button">暫停</button>
+        <button id="exit-game" type="button">離開</button>
+      </div>
+      <div id="pause-overlay" class="pause-overlay" hidden>PAUSED</div>
+
+      <section id="result-panel" class="result-panel" aria-labelledby="result-title" hidden>
+        <p class="eyebrow">RESULT</p>
+        <h2 id="result-title">遊戲結束</h2>
+        <strong id="result-rank" class="result-rank">A</strong>
+        <dl>
+          <div><dt>Score</dt><dd id="result-score">0</dd></div>
+          <div><dt>Max Combo</dt><dd id="result-combo">0</dd></div>
+          <div><dt>Accuracy</dt><dd id="result-accuracy">0%</dd></div>
+          <div><dt>Perfect</dt><dd id="result-perfect">0</dd></div>
+          <div><dt>Great</dt><dd id="result-great">0</dd></div>
+          <div><dt>Good</dt><dd id="result-good">0</dd></div>
+          <div><dt>Miss</dt><dd id="result-miss">0</dd></div>
+        </dl>
+        <div class="result-actions">
+          <button id="retry-game" type="button">再玩一次</button>
+          <button id="choose-chart" type="button">選擇其他譜面</button>
+        </div>
+      </section>
+    </main>
+    <script src="vendor/fflate-0.8.3.js"></script>
+    <script src="scp-parser.js"></script>
+    <script src="scp-game.js"></script>
+  </body>
+</html>
