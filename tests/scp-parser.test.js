@@ -1,7 +1,9 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const test = require('node:test');
+const vm = require('node:vm');
 const fflate = require('../vendor/fflate-0.8.3.js');
 const { parseScp, serializeScp, ScpParseError } = require('../scp-parser.js');
 
@@ -92,4 +94,15 @@ test('rejects input that is not a ZIP archive', async () => {
     parseScp(encoder.encode('not an scp')),
     (error) => error instanceof ScpParseError && error.code === 'INVALID_ZIP',
   );
+});
+
+test('registers the parser on window when globalThis is a separate object', () => {
+  const window = { fflate };
+  const context = vm.createContext({ window, TextDecoder, TextEncoder });
+  const source = fs.readFileSync(require.resolve('../scp-parser.js'), 'utf8');
+
+  vm.runInContext(source, context);
+
+  assert.equal(typeof window.GugaScpParser?.parseScp, 'function');
+  assert.equal(context.GugaScpParser, window.GugaScpParser);
 });

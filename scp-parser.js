@@ -1,10 +1,15 @@
 (function initScpParser(root, factory) {
-  const codec = typeof module === 'object' && module.exports
+  const isCommonJs = typeof module === 'object' && module.exports;
+  const browserRoot = typeof window === 'object' ? window : root;
+  const codec = isCommonJs
     ? require('./vendor/fflate-0.8.3.js')
-    : root.fflate;
+    : browserRoot.fflate || root.fflate;
   const api = factory(codec);
-  if (typeof module === 'object' && module.exports) module.exports = api;
-  else root.GugaScpParser = api;
+  if (isCommonJs) module.exports = api;
+  else {
+    browserRoot.GugaScpParser = api;
+    if (root !== browserRoot) root.GugaScpParser = api;
+  }
 })(typeof globalThis !== 'undefined' ? globalThis : this, (fflate) => {
   'use strict';
 
