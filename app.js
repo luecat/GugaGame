@@ -1069,7 +1069,9 @@ function resetHideGameBoard() {
   hideGameIntro.hidden = false;
   startHideGameButton.textContent = '開始遊戲';
   hideGameTimer.textContent = '找到企鵝！';
+  hideGameTimer.hidden = true;
   hideGameBlackout.setAttribute('aria-hidden', 'true');
+  hideGameBlackout.classList.remove('is-covering');
   hidePenguin.disabled = true;
   hidePenguinHit.disabled = true;
   hidePenguinHit.classList.remove('is-visible');
@@ -1105,6 +1107,8 @@ function beginHideAndSeekRound() {
   const [x, y, size] = HIDE_GAME_SPOTS[Math.floor(Math.random() * HIDE_GAME_SPOTS.length)];
   const hideDepth = .18 + Math.random() * .24;
   const sideOffset = (Math.random() - .5) * size * .24;
+  hideGameBlackout.classList.add('is-covering');
+  hideGameBlackout.setAttribute('aria-hidden', 'false');
   hideGameIntro.hidden = true;
   hideGameResult.textContent = '';
   hideGameResult.classList.remove('is-visible', 'is-lost');
@@ -1117,12 +1121,14 @@ function beginHideAndSeekRound() {
   hidePenguinHit.classList.remove('is-visible');
   hidePenguin.classList.remove('is-visible', 'hide-penguin-victory', 'hide-penguin-shocked');
   hideGameTimer.textContent = '企鵝正在躲起來…';
-  hideGameBlackout.setAttribute('aria-hidden', 'false');
+  hideGameTimer.hidden = true;
   hideGameRevealTimer = window.setTimeout(() => {
     if (!isHideAndSeekMode || isDead) return;
     isHideAndSeekRunning = true;
     const deadline = Date.now() + 20_000;
+    hideGameBlackout.classList.remove('is-covering');
     hideGameBlackout.setAttribute('aria-hidden', 'true');
+    hideGameTimer.hidden = false;
     hidePenguin.disabled = false;
     hidePenguin.classList.add('is-visible');
     hidePenguinHit.disabled = false;
@@ -1149,6 +1155,7 @@ function finishHideAndSeekRound(userWon) {
   void hidePenguin.offsetWidth;
   hidePenguin.classList.add(userWon ? 'hide-penguin-shocked' : 'hide-penguin-victory');
   hideGameTimer.textContent = userWon ? '你找到企鵝了！' : '時間到！';
+  hideGameTimer.hidden = true;
   hideGameResult.textContent = userWon ? 'YOU WIN' : 'YOU LOST';
   hideGameResult.classList.toggle('is-lost', !userWon);
   hideGameResult.classList.add('is-visible');
