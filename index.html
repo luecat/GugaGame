@@ -12,7 +12,7 @@
     <meta property="og:type" content="website" />
     <title>Gugagame</title>
     <link rel="preload" as="image" href="image/gugugaga-sing.png?v=20260803-13" />
-    <link rel="stylesheet" href="style.css?v=20260805-ball8" />
+    <link rel="stylesheet" href="style.css?v=20260805-hide10" />
   </head>
   <body>
     <main class="world" aria-label="企鵝的草地">
@@ -106,7 +106,7 @@
           <button id="singing-button" type="button">唱歌</button>
           <button id="ball-button" type="button">玩球</button>
           <button id="rps-button" type="button">猜拳</button>
-          <button type="button">捉迷藏</button>
+          <button id="hide-and-seek-button" type="button">捉迷藏</button>
           <button type="button">音遊</button>
           <button type="button">探索</button>
         </div>
@@ -133,6 +133,25 @@
         <canvas id="ball-court" aria-label="玩球場地：移動球拍接住球"></canvas>
         <p class="ball-game-hint">滑鼠或手指左右移動球拍</p>
       </section>
+      <section id="hide-and-seek-game" class="hide-and-seek-game" aria-label="和企鵝玩捉迷藏" aria-hidden="true" inert>
+        <div class="hide-game-toolbar">
+          <span id="hide-game-timer" class="hide-game-timer" aria-live="polite">找到企鵝！</span>
+          <button id="close-hide-game" type="button" aria-label="結束捉迷藏">結束</button>
+        </div>
+        <div id="hide-game-board" class="hide-game-board">
+          <div id="hide-game-intro" class="hide-game-intro">
+            <p>企鵝要躲起來囉！</p>
+            <button id="start-hide-game" type="button">開始遊戲</button>
+          </div>
+          <div id="hide-game-spots" class="hide-game-spots" aria-hidden="true"></div>
+          <button id="hide-penguin" class="hide-penguin" type="button" aria-label="找到躲起來的企鵝" disabled>
+            <img src="image/gugugaga-white.png" alt="" draggable="false" />
+          </button>
+          <button id="hide-penguin-hit" class="hide-penguin-hit" type="button" aria-label="點擊企鵝" disabled></button>
+          <p id="hide-game-result" class="hide-game-result" aria-live="assertive"></p>
+          <div id="hide-game-blackout" class="hide-game-blackout" aria-hidden="true"><span>企鵝正在躲起來…</span></div>
+        </div>
+      </section>
       <section id="death-screen" class="death-screen" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="death-title" inert>
         <div class="death-content">
           <h1 id="death-title">你死了</h1>
@@ -141,6 +160,6 @@
         </div>
       </section>
     </main>
-    <script src="app.js?v=20260805-ball10"></script>
+    <script src="app.js?v=20260805-hide7"></script>
   </body>
 </html>
