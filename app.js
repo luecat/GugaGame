@@ -1040,6 +1040,7 @@ const HIDE_GAME_SPOTS = [
   [84, 20, 80, 'boulder'], [23, 58, 94, 'bush'], [49, 53, 108, 'hut'],
   [77, 58, 92, 'boulder'], [12, 82, 84, 'boulder'], [63, 81, 96, 'bush'], [89, 79, 78, 'boulder'],
 ];
+const HIDE_GAME_DURATION = 10_000;
 
 function renderHideGameSpots() {
   hideGameSpots.replaceChildren(...HIDE_GAME_SPOTS.map(([x, y, size, type]) => {
@@ -1125,7 +1126,7 @@ function beginHideAndSeekRound() {
   hideGameRevealTimer = window.setTimeout(() => {
     if (!isHideAndSeekMode || isDead) return;
     isHideAndSeekRunning = true;
-    const deadline = Date.now() + 20_000;
+    const deadline = Date.now() + HIDE_GAME_DURATION;
     hideGameBlackout.classList.remove('is-covering');
     hideGameBlackout.setAttribute('aria-hidden', 'true');
     hideGameTimer.hidden = false;
@@ -1139,7 +1140,7 @@ function beginHideAndSeekRound() {
     };
     updateTimer();
     hideGameCountdownTimer = window.setInterval(updateTimer, 250);
-    hideGameTimeout = window.setTimeout(() => finishHideAndSeekRound(false), 20_000);
+    hideGameTimeout = window.setTimeout(() => finishHideAndSeekRound(false), HIDE_GAME_DURATION);
   }, 3000);
 }
 
