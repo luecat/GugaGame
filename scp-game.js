@@ -24,6 +24,7 @@ const chooseChartButton = document.querySelector('#choose-chart');
 const scoreValue = document.querySelector('#score-value');
 const comboValue = document.querySelector('#combo-value');
 const lifeValue = document.querySelector('#life-value');
+const scpParser = window.GugaScpParser;
 
 const KEY_LANES = new Map([
   ['s', -5], ['d', -3], ['f', -1], ['j', 1], ['k', 3], ['l', 5],
@@ -302,7 +303,8 @@ async function loadScp(file) {
   setLoadStatus(`正在解開 ${file.name}…`, 'working');
   releaseCover();
   audioPlayer.stop();
-  const parsed = await GugaScpParser.parseScp(file);
+  if (!scpParser) throw new Error('SCP 解析器載入失敗，請重新整理頁面後再試。');
+  const parsed = await scpParser.parseScp(file);
   const level = parsed.levels[0];
   if (!level.assets.bgm) throw new Error('這個關卡沒有 BGM resource。');
   const bgmBytes = parsed.getRepositoryResource(level.assets.bgm.hash);
@@ -833,4 +835,8 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden && game.running && !game.paused) togglePause().catch(console.error);
 });
 audioPlayer.onended = finishGame;
+if (!scpParser) {
+  fileInput.disabled = true;
+  setLoadStatus('SCP 解析器載入失敗，請重新整理頁面後再試。', 'error');
+}
 resizeCanvas();

@@ -69,7 +69,9 @@ fileInput.addEventListener('change', async () => {
   latestParsed = null;
   setStatus(`正在解析 ${file.name}…`, 'working');
   try {
-    const parsed = await GugaScpParser.parseScp(file);
+    const parser = window.GugaScpParser;
+    if (!parser) throw new Error('SCP 解析器載入失敗，請重新整理頁面後再試。');
+    const parsed = await parser.parseScp(file);
     latestParsed = parsed;
     renderLevel(parsed.levels[0], 0, parsed.levels.length);
     downloadButton.disabled = false;
@@ -82,7 +84,9 @@ fileInput.addEventListener('change', async () => {
 
 downloadButton.addEventListener('click', () => {
   if (!latestParsed) return;
-  const json = GugaScpParser.serializeScp(latestParsed);
+  const parser = window.GugaScpParser;
+  if (!parser) return;
+  const json = parser.serializeScp(latestParsed);
   const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
   const anchor = document.createElement('a');
   anchor.href = url;
