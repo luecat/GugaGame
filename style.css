@@ -73,7 +73,6 @@ body.feeding-mode .pet { pointer-events: none; }
 .adventure-menu { position: fixed; z-index: 80; inset: 0; display: grid; grid-template-rows: auto 1fr; gap: clamp(18px, 4vh, 42px); padding: max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left)); background: #b9e8f7; color: #111; visibility: hidden; opacity: 0; pointer-events: none; transition: opacity .2s ease, visibility 0s linear .2s; }
 body.adventure-menu-open .adventure-menu { visibility: visible; opacity: 1; pointer-events: auto; transition-delay: 0s; }
 body.adventure-menu-open .world > :not(.adventure-menu) { visibility: hidden; pointer-events: none; }
-body.adventure-menu-open .world > .hud { z-index: 81; visibility: visible; opacity: 1; pointer-events: none; }
 .adventure-menu-header { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
 .adventure-menu h1 { margin: 0; font-size: clamp(26px, 5vw, 46px); letter-spacing: .06em; }
 .adventure-menu-header button, .adventure-card { border: 2px solid #111; border-radius: 4px; background: #fff; color: #111; font: inherit; cursor: pointer; }
