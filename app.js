@@ -1896,7 +1896,16 @@ document.addEventListener('visibilitychange', () => {
 });
 
 // Game feature controls.
-adventureButton.addEventListener('click', () => setAdventureMenu(true));
+function openAdventureMenu(event) {
+  if (event?.cancelable) event.preventDefault();
+  setAdventureMenu(true);
+}
+adventureButton.addEventListener('click', openAdventureMenu);
+// Start on press so mobile browsers do not lose the click when the menu layer opens.
+adventureButton.addEventListener('pointerdown', (event) => {
+  if (event.pointerType !== 'mouse') openAdventureMenu(event);
+});
+adventureButton.addEventListener('touchstart', openAdventureMenu, { passive: false });
 closeAdventureMenuButton.addEventListener('click', () => setAdventureMenu(false));
 adventureMenu.querySelector('[data-adventure-game="catch"]').addEventListener('click', () => setCatchMode(true));
 closeCatchGameButton.addEventListener('click', () => {
