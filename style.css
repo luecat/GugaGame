@@ -110,6 +110,7 @@ body.feeding-mode .food-picker { display: grid; }
 body.feeding-mode #feed-button { background: #b45b5b; }
 body.feeding-mode .feature-actions { grid-template-columns: 1fr; }
 body.feeding-mode #interact-button { display: none; }
+body.feeding-mode #adventure-button { display: none; }
 .interaction-picker button { min-height: 0; padding: 7px 9px; background: #52747f; }
 body.interaction-mode .interaction-picker { display: grid; }
 body.interaction-mode .feature-actions { grid-template-columns: 1fr; }
