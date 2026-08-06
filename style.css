@@ -52,7 +52,7 @@ body.feeding-mode .pet { pointer-events: none; }
 .pet.stone-greeting { transition: none; }
 .pet.dragging { z-index: 6; cursor: grabbing; transition: none; }
 .pet.falling { z-index: 6; transition: none; }
-.pet.hurt img { animation: hurt-flash .62s ease-out; }
+.pet.hurt img, .catch-penguin.hurt img { animation: hurt-flash .62s ease-out; }
 .world.is-dying::after { content: ""; position: fixed; inset: 0; z-index: 40; pointer-events: none; background: #b00000b8; animation: death-flash .18s ease-out both; }
 .pet.death-jumpscare { position: fixed; z-index: 50; left: 50% !important; top: 50% !important; bottom: auto !important; width: min(135vw, 135vh, 1050px); pointer-events: none; transition: none; animation: death-jumpscare .38s cubic-bezier(.05,.95,.12,1) both; }
 .pet.death-jumpscare img { filter: sepia(.35) saturate(1.8) hue-rotate(315deg) contrast(1.08) drop-shadow(0 18px 18px #31000088); }
