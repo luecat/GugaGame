@@ -100,8 +100,12 @@ body.catch-mode .catch-game { visibility: visible; opacity: 1; pointer-events: a
 .bomb-art { position: relative; display: block; width: 30px; height: 30px; border-radius: 50%; background: #242424; box-shadow: inset 5px 4px 0 #ffffff38, 0 2px 0 #111; }
 .bomb-art::before { content: ""; position: absolute; left: 13px; top: -7px; width: 7px; height: 10px; border-radius: 2px 2px 0 0; background: #5d4037; transform: rotate(18deg); }
 .bomb-art::after { content: ""; position: absolute; left: 19px; top: -11px; width: 7px; height: 7px; border-radius: 50%; background: #f5b942; box-shadow: 5px -3px 0 -1px #f0744c; }
+.catch-explosion { position: absolute; z-index: 4; width: 76px; height: 76px; border-radius: 50%; pointer-events: none; transform: translate(-50%, -50%) scale(.2); background: radial-gradient(circle, #fff9c8 0 14%, #ffd64a 15% 33%, #f27a35 34% 50%, #e44b32 51% 59%, transparent 60%); box-shadow: 0 0 16px 6px #ffb43caa; animation: catch-explosion .42s ease-out forwards; }
+.catch-explosion::before, .catch-explosion::after { content: ""; position: absolute; inset: -13px; border-radius: 50%; background: repeating-conic-gradient(from 0deg, #ffcf40 0 12deg, transparent 12deg 40deg); }
+.catch-explosion::after { inset: 7px; background: repeating-conic-gradient(from 18deg, #f25c36 0 9deg, transparent 9deg 45deg); }
 .catch-help { position: absolute; z-index: 3; bottom: 2%; left: 50%; margin: 0; transform: translateX(-50%); color: #111; font-size: clamp(11px, 1.7vw, 15px); font-weight: 800; text-align: center; white-space: nowrap; }
 @keyframes catch-fall { from { transform: translateY(-70px) rotate(0deg); } to { transform: translateY(110vh) rotate(360deg); } }
+@keyframes catch-explosion { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.2); } 25% { opacity: 1; transform: translate(-50%, -50%) scale(.85); } 100% { opacity: 0; transform: translate(-50%, -50%) scale(1.15); } }
 .food-picker, .interaction-picker { display: none; grid-template-columns: repeat(2, minmax(72px, 1fr)); gap: 7px; }
 body.feeding-mode .food-picker { display: grid; }
 body.feeding-mode #feed-button { background: #b45b5b; }
