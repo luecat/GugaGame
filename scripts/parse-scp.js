@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* TEST-ONLY SCP MODULE: command-line parser entry point. */
 'use strict';
 
 const fs = require('node:fs');

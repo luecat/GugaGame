@@ -1,3 +1,4 @@
+/* TEST-ONLY SCP MODULE: parser demo styles. */
 :root { color: #29424c; background: #8ed7f4; font-family: ui-rounded, "SF Pro Rounded", "PingFang TC", system-ui, sans-serif; }
 * { box-sizing: border-box; }
 body { min-height: 100vh; margin: 0; background: linear-gradient(#80d2ef 0 42%, #72c45e 42%); }

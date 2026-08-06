@@ -1,3 +1,4 @@
+/* TEST-ONLY SCP MODULE: parser demo controller. */
 const fileInput = document.querySelector('#scp-file');
 const status = document.querySelector('#status');
 const result = document.querySelector('#result');
