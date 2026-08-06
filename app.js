@@ -90,6 +90,7 @@ let catchApplesCount = 0;
 let catchStonesCount = 0;
 const catchItems = new Set();
 const catchGameState = { lastTime: 0, penguinX: .5 };
+let catchPenguinPointerId = null;
 let isHideAndSeekMode = false;
 let isHideAndSeekRunning = false;
 let hideGameRevealTimer;
@@ -971,8 +972,25 @@ function setAdventureMenu(enabled) {
   }
 }
 
-catchGame.addEventListener('pointermove', (event) => { if (isCatchMode) moveCatchPenguin(event.clientX); });
-catchGame.addEventListener('pointerdown', (event) => { if (isCatchMode && event.target !== closeCatchGameButton) moveCatchPenguin(event.clientX); });
+catchPenguin.addEventListener('pointerdown', (event) => {
+  if (!isCatchMode) return;
+  event.preventDefault();
+  catchPenguinPointerId = event.pointerId;
+  catchPenguin.setPointerCapture?.(event.pointerId);
+  moveCatchPenguin(event.clientX);
+});
+catchPenguin.addEventListener('pointermove', (event) => {
+  if (!isCatchMode || event.pointerId !== catchPenguinPointerId) return;
+  event.preventDefault();
+  moveCatchPenguin(event.clientX);
+});
+function endCatchPenguinDrag(event) {
+  if (event.pointerId !== catchPenguinPointerId) return;
+  catchPenguinPointerId = null;
+  if (catchPenguin.hasPointerCapture?.(event.pointerId)) catchPenguin.releasePointerCapture(event.pointerId);
+}
+catchPenguin.addEventListener('pointerup', endCatchPenguinDrag);
+catchPenguin.addEventListener('pointercancel', endCatchPenguinDrag);
 document.addEventListener('keydown', (event) => {
   if (!isCatchMode || !['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
   event.preventDefault();
