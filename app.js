@@ -909,9 +909,23 @@ function catchItemLanded(item) {
   if (!overlaps) return false;
   if (item.type === 'apple') catchApplesCount += 1;
   else if (item.type === 'stone') catchStonesCount += 1;
-  else { catchApplesCount = 0; catchStonesCount = 0; }
+  else {
+    showCatchExplosion(item);
+    catchApplesCount = 0;
+    catchStonesCount = 0;
+  }
   renderCatchScore();
   return true;
+}
+
+function showCatchExplosion(item) {
+  const explosion = document.createElement('span');
+  explosion.className = 'catch-explosion';
+  explosion.setAttribute('aria-hidden', 'true');
+  explosion.style.left = `${item.x + 27}px`;
+  explosion.style.top = `${item.y + 27}px`;
+  catchField.append(explosion);
+  explosion.addEventListener('animationend', () => explosion.remove(), { once: true });
 }
 
 function catchGameFrame(timestamp) {
