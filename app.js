@@ -15,6 +15,7 @@ const featurePanel = document.querySelector('.feature-panel');
 const feedButton = document.querySelector('#feed-button');
 const feedButtonLabel = document.querySelector('#feed-button-label');
 const foodPicker = document.querySelector('#food-picker');
+const foodEmptyHint = document.querySelector('#food-empty-hint');
 const interactButton = document.querySelector('#interact-button');
 const interactButtonLabel = document.querySelector('#interact-button-label');
 const interactionPicker = document.querySelector('#interaction-picker');
@@ -159,14 +160,17 @@ function saveFoodInventory() {
 }
 
 function updateFoodPicker() {
+  let totalQuantity = 0;
   foodPicker.querySelectorAll('[data-food-type]').forEach((button) => {
     const type = button.dataset.foodType;
     const quantity = foodInventory[type] ?? 0;
+    totalQuantity += quantity;
     const label = button.querySelector('.food-quantity');
     if (label) label.textContent = `×${quantity}`;
     button.disabled = quantity <= 0;
     button.setAttribute('aria-label', `${type === 'apple' ? '蘋果' : '石頭'}，剩餘 ${quantity} 個`);
   });
+  foodEmptyHint.hidden = totalQuantity > 0;
 }
 
 function readSavedVolume() {
