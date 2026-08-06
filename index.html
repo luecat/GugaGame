@@ -80,6 +80,10 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5h16v11H9l-5 4v-15Z" /><path d="M8 10h8M8 13h5" /></svg>
             <span id="interact-button-label">互動</span>
           </button>
+          <button id="adventure-button" type="button" aria-label="開啟探險模式">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 19 6.5-6.5 3 3L20 9" /><path d="M16 9h4v4" /><path d="M4 5h7" /></svg>
+            <span>探險</span>
+          </button>
         </div>
         <div id="food-picker" class="food-picker" aria-label="選擇食物" aria-hidden="true" inert>
           <button type="button" data-food-type="apple" aria-label="蘋果，剩餘 99 個"><span class="food-art food-art-apple" aria-hidden="true"></span><span>蘋果</span><small class="food-quantity" aria-hidden="true">×99</small></button>
@@ -102,6 +106,32 @@
             <button type="button" data-rps-choice="paper" aria-label="出布"><img src="image/布.png?v=20260804-rps2" alt="" draggable="false" /><span>布</span></button>
           </div>
         </div>
+      </section>
+      <section id="adventure-menu" class="adventure-menu" aria-label="探險模式選單" aria-hidden="true" inert>
+        <div class="adventure-menu-header">
+          <h1>探險模式</h1>
+          <button id="close-adventure-menu" type="button">返回</button>
+        </div>
+        <div class="adventure-grid">
+          <button class="adventure-card" type="button" data-adventure-game="catch"><span class="adventure-card-icon">🍎</span><span>接接樂</span><small>接住天上掉下來的物品</small></button>
+          <button class="adventure-card is-locked" type="button" disabled><span class="adventure-card-icon">🗺️</span><span>神秘地圖</span><small>敬請期待</small></button>
+          <button class="adventure-card is-locked" type="button" disabled><span class="adventure-card-icon">🏕️</span><span>野外露營</span><small>敬請期待</small></button>
+          <button class="adventure-card is-locked" type="button" disabled><span class="adventure-card-icon">🎣</span><span>河邊釣魚</span><small>敬請期待</small></button>
+          <button class="adventure-card is-locked" type="button" disabled><span class="adventure-card-icon">⛏️</span><span>礦坑探險</span><small>敬請期待</small></button>
+          <button class="adventure-card is-locked" type="button" disabled><span class="adventure-card-icon">🌲</span><span>森林漫步</span><small>敬請期待</small></button>
+        </div>
+      </section>
+      <section id="catch-game" class="catch-game" aria-label="接接樂" aria-hidden="true" inert>
+        <div class="catch-sky" aria-hidden="true"></div>
+        <div class="catch-ground" aria-hidden="true"></div>
+        <div class="catch-hud" aria-live="polite">
+          <span class="catch-score"><span class="food-art food-art-apple" aria-hidden="true"></span><strong id="catch-apples">0</strong></span>
+          <span class="catch-score"><span class="food-art food-art-stone" aria-hidden="true"></span><strong id="catch-stones">0</strong></span>
+        </div>
+        <button id="close-catch-game" class="catch-close" type="button">結束</button>
+        <div id="catch-field" class="catch-field" aria-label="接接樂遊戲區"></div>
+        <button id="catch-penguin" class="catch-penguin" type="button" aria-label="企鵝，左右移動以接住物品"><img src="image/gugugaga-white.png" alt="企鵝" draggable="false" /></button>
+        <p class="catch-help">左右移動企鵝接住蘋果和石頭，避開炸藥</p>
       </section>
       <p id="rps-result" class="rps-result" aria-live="polite" aria-hidden="true">選一個出拳吧</p>
       <section id="ball-game" class="ball-game" aria-label="和企鵝玩球" aria-hidden="true" inert>

@@ -33,6 +33,15 @@ const ballCourt = document.querySelector('#ball-court');
 const ballGameStatus = document.querySelector('#ball-game-status');
 const closeBallGameButton = document.querySelector('#close-ball-game');
 const ballComboValue = document.querySelector('#ball-combo-value');
+const adventureButton = document.querySelector('#adventure-button');
+const adventureMenu = document.querySelector('#adventure-menu');
+const closeAdventureMenuButton = document.querySelector('#close-adventure-menu');
+const catchGame = document.querySelector('#catch-game');
+const catchField = document.querySelector('#catch-field');
+const catchPenguin = document.querySelector('#catch-penguin');
+const closeCatchGameButton = document.querySelector('#close-catch-game');
+const catchApples = document.querySelector('#catch-apples');
+const catchStones = document.querySelector('#catch-stones');
 const themeColorMeta = document.querySelector('meta[name="theme-color"]');
 const hungerMeter = document.querySelector('.hunger');
 const hungerFill = document.querySelector('.hunger-fill');
@@ -61,6 +70,14 @@ let isSingingMode = false;
 let isRpsMode = false;
 let isRpsResolving = false;
 let isBallMode = false;
+let isAdventureMenuOpen = false;
+let isCatchMode = false;
+let catchAnimationFrame;
+let catchSpawnTimer;
+let catchApplesCount = 0;
+let catchStonesCount = 0;
+const catchItems = new Set();
+const catchGameState = { lastTime: 0, penguinX: .5 };
 let ballCombo = 0;
 const BALL_PLAYER_Y = .80;
 let penguinWinStreak = 0;
@@ -821,6 +838,122 @@ function moveBallPaddle(clientX) {
 ballCourt.addEventListener('pointerdown', (event) => { event.preventDefault(); moveBallPaddle(event.clientX); ballCourt.setPointerCapture?.(event.pointerId); });
 ballCourt.addEventListener('pointermove', (event) => { if (isBallMode) { event.preventDefault(); moveBallPaddle(event.clientX); } });
 window.addEventListener('resize', () => { if (isBallMode) { resizeBallCourt(); resetBallServe(); } });
+
+function renderCatchScore() {
+  catchApples.textContent = String(catchApplesCount);
+  catchStones.textContent = String(catchStonesCount);
+}
+
+function moveCatchPenguin(clientX) {
+  const fieldRect = catchField.getBoundingClientRect();
+  const penguinWidth = catchPenguin.offsetWidth;
+  const nextLeft = Math.max(0, Math.min(fieldRect.width - penguinWidth, clientX - fieldRect.left - penguinWidth / 2));
+  catchPenguin.style.left = `${nextLeft}px`;
+  catchGameState.penguinX = (nextLeft + penguinWidth / 2) / fieldRect.width;
+}
+
+function spawnCatchItem() {
+  if (!isCatchMode) return;
+  const type = Math.random() < .44 ? 'apple' : (Math.random() < .7 ? 'stone' : 'bomb');
+  const item = document.createElement('div');
+  item.className = `catch-item catch-item-${type}`;
+  item.setAttribute('aria-hidden', 'true');
+  if (type === 'bomb') item.textContent = '💣';
+  else {
+    const art = document.createElement('span');
+    art.className = `food-art food-art-${type}`;
+    item.append(art);
+  }
+  const size = 54;
+  const state = { type, x: Math.random() * Math.max(1, catchField.clientWidth - size), y: -size, speed: 180 + Math.random() * 130, element: item };
+  item.style.left = `${state.x}px`;
+  item.style.top = `${state.y}px`;
+  item.style.animation = 'none';
+  catchField.append(item);
+  catchItems.add(state);
+}
+
+function catchItemLanded(item) {
+  const penguinRect = catchPenguin.getBoundingClientRect();
+  const itemRect = item.element.getBoundingClientRect();
+  const overlaps = itemRect.right > penguinRect.left + 12 && itemRect.left < penguinRect.right - 12 && itemRect.bottom > penguinRect.top + 18 && itemRect.top < penguinRect.bottom;
+  if (!overlaps) return false;
+  if (item.type === 'apple') catchApplesCount += 1;
+  else if (item.type === 'stone') catchStonesCount += 1;
+  else { catchApplesCount = 0; catchStonesCount = 0; }
+  renderCatchScore();
+  return true;
+}
+
+function catchGameFrame(timestamp) {
+  if (!isCatchMode) return;
+  const delta = Math.min(.04, Math.max(0, (timestamp - catchGameState.lastTime) / 1000 || 0));
+  catchGameState.lastTime = timestamp;
+  const groundTop = catchField.clientHeight * .8;
+  catchItems.forEach((item) => {
+    item.y += item.speed * delta;
+    item.element.style.top = `${item.y}px`;
+    if (catchItemLanded(item) || item.y > groundTop) {
+      item.element.remove();
+      catchItems.delete(item);
+    }
+  });
+  catchAnimationFrame = window.requestAnimationFrame(catchGameFrame);
+}
+
+function clearCatchItems() {
+  catchItems.forEach((item) => item.element.remove());
+  catchItems.clear();
+}
+
+function setCatchMode(enabled) {
+  if (enabled && (isSettingsOpen() || isDead || isRpsResolving)) return;
+  isCatchMode = enabled;
+  document.body.classList.toggle('catch-mode', enabled);
+  catchGame.inert = !enabled;
+  catchGame.setAttribute('aria-hidden', String(!enabled));
+  if (!enabled) {
+    window.cancelAnimationFrame(catchAnimationFrame);
+    window.clearInterval(catchSpawnTimer);
+    clearCatchItems();
+    return;
+  }
+  isAdventureMenuOpen = false;
+  document.body.classList.remove('adventure-menu-open');
+  adventureMenu.inert = true;
+  setFeedingMode(false); setInteractionMode(false); setSingingMode(false); setRpsMode(false); setBallMode(false);
+  walking = false;
+  pet.classList.remove('walking');
+  catchApplesCount = 0; catchStonesCount = 0; renderCatchScore();
+  catchPenguin.style.left = '50%';
+  catchGameState.lastTime = performance.now();
+  window.clearInterval(catchSpawnTimer);
+  catchSpawnTimer = window.setInterval(spawnCatchItem, 650);
+  spawnCatchItem();
+  catchAnimationFrame = window.requestAnimationFrame(catchGameFrame);
+}
+
+function setAdventureMenu(enabled) {
+  if (enabled && (isSettingsOpen() || isDead || isRpsResolving)) return;
+  isAdventureMenuOpen = enabled;
+  document.body.classList.toggle('adventure-menu-open', enabled);
+  adventureMenu.inert = !enabled;
+  adventureMenu.setAttribute('aria-hidden', String(!enabled));
+  if (enabled) {
+    setFeedingMode(false); setInteractionMode(false); setSingingMode(false); setRpsMode(false); setBallMode(false);
+    walking = false;
+    pet.classList.remove('walking');
+  }
+}
+
+catchGame.addEventListener('pointermove', (event) => { if (isCatchMode) moveCatchPenguin(event.clientX); });
+catchGame.addEventListener('pointerdown', (event) => { if (isCatchMode && event.target !== closeCatchGameButton) moveCatchPenguin(event.clientX); });
+document.addEventListener('keydown', (event) => {
+  if (!isCatchMode || !['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+  event.preventDefault();
+  const current = catchPenguin.getBoundingClientRect().left + catchPenguin.offsetWidth / 2;
+  moveCatchPenguin(current + (event.key === 'ArrowLeft' ? -48 : 48));
+});
 
 function moveFoodWithPointer(event) {
   if (pendingFoodDrag?.pointerId === event.pointerId) {
@@ -1601,6 +1734,14 @@ document.addEventListener('visibilitychange', () => {
 });
 
 // Game feature controls.
+adventureButton.addEventListener('click', () => setAdventureMenu(true));
+closeAdventureMenuButton.addEventListener('click', () => setAdventureMenu(false));
+adventureMenu.querySelector('[data-adventure-game="catch"]').addEventListener('click', () => setCatchMode(true));
+closeCatchGameButton.addEventListener('click', () => {
+  setCatchMode(false);
+  setAdventureMenu(true);
+});
+
 feedButton.addEventListener('click', () => {
   if (isSettingsOpen() || isDead || isRpsResolving) return;
   setInteractionMode(false);
