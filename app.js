@@ -858,7 +858,12 @@ function spawnCatchItem() {
   const item = document.createElement('div');
   item.className = `catch-item catch-item-${type}`;
   item.setAttribute('aria-hidden', 'true');
-  if (type === 'bomb') item.textContent = '💣';
+  if (type === 'bomb') {
+    const bomb = document.createElement('span');
+    bomb.className = 'bomb-art';
+    bomb.setAttribute('aria-hidden', 'true');
+    item.append(bomb);
+  }
   else {
     const art = document.createElement('span');
     art.className = `food-art food-art-${type}`;
