@@ -1758,6 +1758,7 @@ function stopSound(sound) {
 function triggerDeath(cause = '企鵝失去了所有血量') {
   if (isDead) return;
   isDead = true;
+  setCatchMode(false);
   setHideAndSeekMode(false);
   setFeedingMode(false);
   setSingingMode(false);
