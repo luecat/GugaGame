@@ -256,6 +256,7 @@ const MAX_HEALTH = 100;
 const MAX_HUNGER = 10;
 const MAX_AFFECTION = 100;
 const HEALTH_UNIT = 20;
+const CATCH_BOMB_DAMAGE = 10;
 const FALL_GRAVITY = 1900;
 const SAFE_FALL_HEIGHT = 120;
 const FALL_DAMAGE_HEIGHT_STEP = 100;
@@ -924,6 +925,7 @@ function catchItemLanded(item) {
     showCatchExplosion(item);
     catchApplesCount = 0;
     catchStonesCount = 0;
+    showHurtEffect(CATCH_BOMB_DAMAGE, '企鵝被炸彈砸中了', catchPenguin);
   }
   renderCatchScore();
   return true;
@@ -1822,7 +1824,7 @@ function restartGame() {
   renderAffection();
 }
 
-function showHurtEffect(damage, cause) {
+function showHurtEffect(damage, cause, visualTarget = pet) {
   if (isDead) return;
   health = Math.max(0, health - damage);
   affection = Math.max(0, affection - damage * AFFECTION_LOSS_PER_DAMAGE);
@@ -1833,10 +1835,10 @@ function showHurtEffect(damage, cause) {
     return;
   }
   playHurtSound();
-  pet.classList.remove('hurt');
-  void pet.offsetWidth;
-  pet.classList.add('hurt');
-  window.setTimeout(() => pet.classList.remove('hurt'), 650);
+  visualTarget.classList.remove('hurt');
+  void visualTarget.offsetWidth;
+  visualTarget.classList.add('hurt');
+  window.setTimeout(() => visualTarget.classList.remove('hurt'), 650);
 }
 
 function calculateFallDamage(fallDistance) {
