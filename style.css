@@ -63,11 +63,8 @@ body.feeding-mode .pet { pointer-events: none; }
 .death-content p { margin: 0 0 30px; font-size: clamp(15px, 2.5vw, 21px); font-weight: 700; }
 .death-content button { justify-self: center; width: min(280px, 100%); min-height: 48px; padding: 12px 20px; border: 0; border-radius: 2px; background: #555; color: white; cursor: pointer; font: inherit; font-size: 16px; font-weight: 800; }
 .death-content button:focus-visible { outline: 3px solid white; outline-offset: 4px; }
-.debug-panel, .feature-panel { position: absolute; z-index: 4; bottom: 18px; display: grid; gap: 7px; padding: 11px; border-radius: 10px; background: #ffffffc4; color: #38515b; font-size: 12px; font-weight: 700; transition: opacity .2s ease, visibility .2s ease; }
-.debug-panel { left: 18px; } .feature-panel { right: 18px; }
-.settings-menu .debug-panel { position: static; z-index: auto; padding: 0; border-radius: 0; background: transparent; }
-.settings-menu .debug-panel > span { display: block; }
-.debug-panel button, .feature-panel button { padding: 7px 9px; border: 0; border-radius: 6px; background: #38515b; color: white; cursor: pointer; font: inherit; touch-action: manipulation; }
+.feature-panel { position: absolute; z-index: 4; right: 18px; bottom: 18px; display: grid; gap: 7px; padding: 11px; border-radius: 10px; background: #ffffffc4; color: #38515b; font-size: 12px; font-weight: 700; transition: opacity .2s ease, visibility .2s ease; }
+.feature-panel button { padding: 7px 9px; border: 0; border-radius: 6px; background: #38515b; color: white; cursor: pointer; font: inherit; touch-action: manipulation; }
 .feature-panel button { display: flex; align-items: center; justify-content: center; gap: 5px; } .feature-panel button svg { width: 15px; height: 15px; fill: #ef6f71; stroke: #ef6f71; stroke-width: 1.5; }
 .feature-actions { display: grid; grid-template-columns: repeat(2, minmax(72px, 1fr)); gap: 7px; }
 .adventure-menu { position: fixed; z-index: 80; inset: 0; display: grid; grid-template-rows: auto 1fr; gap: clamp(18px, 4vh, 42px); padding: max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left)); background: #b9e8f7; color: #111; visibility: hidden; opacity: 0; pointer-events: none; transition: opacity .2s ease, visibility 0s linear .2s; }
@@ -208,9 +205,6 @@ body.singing-song-playing .pet img { transform: translateY(var(--singing-lift, 0
 .food-picker [data-food-type="stone"] .food-rarity svg:nth-child(3) { display: none; }
 .food-picker [data-food-type="stone"] .food-rarity::after { content: ""; display: block; width: 13px; height: 13px; background: currentColor; clip-path: polygon(50% 0, 61% 36%, 100% 36%, 69% 58%, 81% 100%, 50% 74%, 19% 100%, 31% 58%, 0 36%, 39% 36%); }
 .food-quantity { font-size: .72rem; line-height: 1; opacity: .85; }
-.debug-food-control { display: flex; align-items: center; gap: .35rem; flex-wrap: wrap; }
-.debug-food-control select, .debug-food-control input { min-width: 0; padding: .25rem .35rem; border: 1px solid #78919a; border-radius: .35rem; font: inherit; }
-.debug-food-control input { width: 4.5rem; }
 .food-art { position: relative; display: block; flex: 0 0 auto; width: 30px; height: 28px; }
 .food-art-apple { width: 29px; height: 25px; margin-top: 3px; border-radius: 46% 46% 52% 52% / 42% 42% 60% 60%; background: linear-gradient(135deg, #ff7870 0 34%, #dc3e45 72%); box-shadow: inset -4px -3px 0 #a9263038, inset 3px 2px 0 #ffffff40; }
 .food-art-apple::before { content: ""; position: absolute; left: 14px; top: -8px; width: 4px; height: 10px; border-radius: 4px; background: #68462d; transform: rotate(12deg); }
@@ -226,9 +220,6 @@ body:not(.feeding-mode) .feeding-item { display: none; }
 .feeding-item.landed { pointer-events: none; animation: food-fade-out .5s ease-out .3s both; }
 .feeding-item-stone.landed { animation-delay: 2.5s; }
 body.is-night { background: #17284d; } body.is-night .sky { background: #263f76; } body.is-night .sun { opacity: 0; transform: translateY(15px); } body.is-night .moon { opacity: 1; transform: translateY(0); } body.is-night .cloud { fill: #aeb8d4; opacity: .25; } body.is-night .grass { background: #376e41; border-top-color: #528b57; }
-/* DEBUG ONLY: preview classes always win over the browser-clock state. */
-body.debug-force-night { background: #17284d; } body.debug-force-night .sky { background: #263f76; } body.debug-force-night .sun { opacity: 0; transform: translateY(15px); } body.debug-force-night .moon { opacity: 1; transform: translateY(0); } body.debug-force-night .cloud { fill: #aeb8d4; opacity: .35; } body.debug-force-night .grass { background: #376e41; border-top-color: #528b57; }
-body.debug-force-day { background: #8ed7f4; } body.debug-force-day .sky { background: #80d2ef; } body.debug-force-day .sun { opacity: 1; transform: translateY(0); } body.debug-force-day .moon { opacity: 0; transform: translateY(15px); } body.debug-force-day .cloud { fill: #fff; opacity: .62; } body.debug-force-day .grass { background: #5bad4a; border-top-color: #93d878; }
 @keyframes waddle { to { transform: rotate(3deg) translateY(-2px); } }
 @keyframes jump { 45% { translate: 0 -105px; } 100% { translate: 0 0; } }
 @keyframes spin { from { rotate: 0deg; } to { rotate: 360deg; } }
@@ -259,10 +250,9 @@ body.debug-force-day { background: #8ed7f4; } body.debug-force-day .sky { backgr
   .stat-track { height: 7px; }
   .affection { gap: 5px; font-size: 10px; }
   .affection-track { height: 7px; }
-  .debug-panel, .feature-panel { bottom: max(10px, env(safe-area-inset-bottom)); padding: 9px; }
-  .debug-panel { left: 10px; }
+  .feature-panel { bottom: max(10px, env(safe-area-inset-bottom)); padding: 9px; }
   .feature-panel { right: 10px; }
-  .debug-panel button, .feature-panel button { min-height: 40px; padding: 8px 10px; }
+  .feature-panel button { min-height: 40px; padding: 8px 10px; }
   .feature-actions { grid-template-columns: repeat(3, minmax(64px, 1fr)); }
   .food-picker, .interaction-picker { grid-template-columns: repeat(2, minmax(64px, 1fr)); }
   .feeding-item { width: 52px; height: 52px; }
@@ -276,7 +266,6 @@ body.debug-force-day { background: #8ed7f4; } body.debug-force-day .sky { backgr
 }
 
 @media (max-width: 380px) {
-  .debug-panel > span { display: none; }
-  .debug-panel, .feature-panel { font-size: 11px; }
+  .feature-panel { font-size: 11px; }
   .pet { width: 108px; }
 }

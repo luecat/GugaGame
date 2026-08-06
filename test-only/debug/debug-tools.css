@@ -1,0 +1,48 @@
+/* TEST-ONLY MODULE: debug panel and visual preview styles. */
+.debug-panel {
+  display: grid;
+  gap: 7px;
+  padding: 0;
+  color: #38515b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.debug-panel > span { display: block; }
+.debug-panel button {
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 6px;
+  background: #38515b;
+  color: white;
+  cursor: pointer;
+  font: inherit;
+  touch-action: manipulation;
+}
+
+.debug-food-control { display: flex; align-items: center; gap: .35rem; flex-wrap: wrap; }
+.debug-food-control select, .debug-food-control input { min-width: 0; padding: .25rem .35rem; border: 1px solid #78919a; border-radius: .35rem; font: inherit; }
+.debug-food-control input { width: 4.5rem; }
+
+/* Preview classes intentionally override the browser-clock state. */
+body.debug-force-night { background: #17284d; }
+body.debug-force-night .sky { background: #263f76; }
+body.debug-force-night .sun { opacity: 0; transform: translateY(15px); }
+body.debug-force-night .moon { opacity: 1; transform: translateY(0); }
+body.debug-force-night .cloud { fill: #aeb8d4; opacity: .35; }
+body.debug-force-night .grass { background: #376e41; border-top-color: #528b57; }
+body.debug-force-day { background: #8ed7f4; }
+body.debug-force-day .sky { background: #80d2ef; }
+body.debug-force-day .sun { opacity: 1; transform: translateY(0); }
+body.debug-force-day .moon { opacity: 0; transform: translateY(15px); }
+body.debug-force-day .cloud { fill: #fff; opacity: .62; }
+body.debug-force-day .grass { background: #5bad4a; border-top-color: #93d878; }
+
+@media (max-width: 600px) {
+  .debug-panel button { min-height: 40px; padding: 8px 10px; }
+}
+
+@media (max-width: 380px) {
+  .debug-panel > span { display: none; }
+  .debug-panel { font-size: 11px; }
+}

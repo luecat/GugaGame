@@ -1,3 +1,4 @@
+/* TEST-ONLY SCP MODULE: parser core. Keep separate from the public game runtime. */
 (function initScpParser(root, factory) {
   const isCommonJs = typeof module === 'object' && module.exports;
   const browserRoot = typeof window === 'object' ? window : root;

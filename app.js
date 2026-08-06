@@ -2028,59 +2028,49 @@ foodPicker.querySelectorAll('[data-food-type]').forEach((button) => {
 });
 updateFoodPicker();
 
-// ===== DEBUG ONLY — isolated visual-preview control; not part of game behaviour. =====
-(() => {
-  const debugButton = document.querySelector('#debug-day-night');
-  const debugHurtButton = document.querySelector('#debug-hurt');
-  const debugFullHungerButton = document.querySelector('#debug-full-hunger');
-  const debugCloudCountButton = document.querySelector('#debug-cloud-count');
-  const debugDeathButton = document.querySelector('#debug-death');
-  const debugFoodType = document.querySelector('#debug-food-type');
-  const debugFoodAmount = document.querySelector('#debug-food-amount');
-  const debugFoodApplyButton = document.querySelector('#debug-food-apply');
-  const debugFoodClearButton = document.querySelector('#debug-food-clear');
-  let previewNight = document.body.classList.contains('is-night');
-  debugButton.addEventListener('click', () => {
-    previewNight = !previewNight;
+// TEST-ONLY DEBUG BRIDGE START
+// All debug UI queries and event handlers live in test-only/debug/debug-tools.js.
+// Production builds can omit that script, stylesheet, and markup; this bridge then does nothing.
+window.GugaDebugTools?.init({
+  root: document.querySelector('[data-test-module="debug-tools"]'),
+  isNight: () => document.body.classList.contains('is-night'),
+  setNightPreview(previewNight) {
     document.body.classList.toggle('debug-force-night', previewNight);
     document.body.classList.toggle('debug-force-day', !previewNight);
-    debugButton.textContent = previewNight ? '切換至白天預覽' : '切換至夜晚預覽';
-  });
-  debugHurtButton.addEventListener('click', () => {
+  },
+  hurt() {
     unlockGameSounds();
     showHurtEffect(HEALTH_UNIT);
-  });
-  debugFullHungerButton.addEventListener('click', () => {
+  },
+  fillHunger() {
     hunger = MAX_HUNGER;
     renderHunger();
     healFromFullHunger();
-  });
-  debugCloudCountButton.addEventListener('click', () => {
+  },
+  cycleCloudCount() {
     const currentCount = debugCloudCount ?? cloudLayer.childElementCount;
     debugCloudCount = (currentCount + 1) % 10;
     renderClouds(debugCloudCount);
-    debugCloudCountButton.textContent = `改雲數量：${debugCloudCount}`;
-  });
-  debugDeathButton.addEventListener('click', () => {
+    return debugCloudCount;
+  },
+  kill() {
     unlockGameSounds();
     health = 0;
     renderHealth();
     triggerDeath('調試專區觸發了死亡');
-  });
-  debugFoodApplyButton.addEventListener('click', () => {
-    const amount = Number.parseInt(debugFoodAmount.value.trim(), 10);
-    if (!Number.isInteger(amount) || amount === 0) return;
-    const type = debugFoodType.value;
+  },
+  adjustFood(type, amount) {
     foodInventory[type] = Math.max(0, Math.min(FOOD_MAX_QUANTITY, foodInventory[type] + amount));
     saveFoodInventory();
     updateFoodPicker();
-  });
-  debugFoodClearButton.addEventListener('click', () => {
-    foodInventory[debugFoodType.value] = 0;
+  },
+  clearFood(type) {
+    foodInventory[type] = 0;
     saveFoodInventory();
     updateFoodPicker();
-  });
-})();
+  },
+});
+// TEST-ONLY DEBUG BRIDGE END
 
 restartButton.addEventListener('click', restartGame);
 
