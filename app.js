@@ -925,7 +925,7 @@ function catchItemLanded(item) {
     showCatchExplosion(item);
     catchApplesCount = 0;
     catchStonesCount = 0;
-    showHurtEffect(CATCH_BOMB_DAMAGE, '企鵝被炸彈砸中了', catchPenguin);
+    showHurtEffect(CATCH_BOMB_DAMAGE, '你的企鵝炸了', catchPenguin);
   }
   renderCatchScore();
   return true;
