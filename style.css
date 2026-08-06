@@ -111,6 +111,7 @@ body.feeding-mode #interact-button { display: none; }
 body.interaction-mode .interaction-picker { display: grid; }
 body.interaction-mode .feature-actions { grid-template-columns: 1fr; }
 body.interaction-mode #feed-button { display: none; }
+body.interaction-mode #adventure-button { display: none; }
 body.interaction-mode #interact-button { background: #b45b5b; }
 .singing-picker { display: none; grid-template-columns: minmax(0, 1fr); width: 100%; gap: 7px; }
 .singing-picker button { width: 100%; min-height: 0; padding: 7px 9px; background: #52747f; }
