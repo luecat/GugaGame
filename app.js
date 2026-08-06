@@ -239,8 +239,6 @@ const STONE_GROUND_LIFETIME_MS = 3000;
 const STONE_GREETING_LOOK_MS = 240;
 const USE_IOS_TOUCH_DRAG = /iPad|iPhone|iPod/.test(navigator.userAgent)
   || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-let debugCloudCount = null;
-
 function getMinuteCloudCount(date = new Date()) {
   return date.getMinutes() % 10;
 }
@@ -299,7 +297,7 @@ function playGenshinSoundWithCloudLock(count = cloudLayer.childElementCount) {
 
 function updateCloudsFromClock() {
   const now = new Date();
-  const count = debugCloudCount ?? getMinuteCloudCount(now);
+  const count = getMinuteCloudCount(now);
   renderClouds(count);
 }
 
@@ -1148,7 +1146,7 @@ function movePenguin() {
   walking = true;
   pet.classList.add('walking');
   pet.style.left = `${position}%`;
-  maybePlayGenshinSound(debugCloudCount ?? getMinuteCloudCount());
+  maybePlayGenshinSound(getMinuteCloudCount());
   window.setTimeout(() => { walking = false; pet.classList.remove('walking'); }, 1250);
 }
 
@@ -1650,60 +1648,6 @@ foodPicker.querySelectorAll('[data-food-type]').forEach((button) => {
   button.addEventListener('touchstart', (event) => prepareFoodTouchDrag(button.dataset.foodType, event), { passive: false });
 });
 updateFoodPicker();
-
-// ===== DEBUG ONLY — isolated visual-preview control; not part of game behaviour. =====
-(() => {
-  const debugButton = document.querySelector('#debug-day-night');
-  const debugHurtButton = document.querySelector('#debug-hurt');
-  const debugFullHungerButton = document.querySelector('#debug-full-hunger');
-  const debugCloudCountButton = document.querySelector('#debug-cloud-count');
-  const debugDeathButton = document.querySelector('#debug-death');
-  const debugFoodType = document.querySelector('#debug-food-type');
-  const debugFoodAmount = document.querySelector('#debug-food-amount');
-  const debugFoodApplyButton = document.querySelector('#debug-food-apply');
-  const debugFoodClearButton = document.querySelector('#debug-food-clear');
-  let previewNight = document.body.classList.contains('is-night');
-  debugButton.addEventListener('click', () => {
-    previewNight = !previewNight;
-    document.body.classList.toggle('debug-force-night', previewNight);
-    document.body.classList.toggle('debug-force-day', !previewNight);
-    debugButton.textContent = previewNight ? '切換至白天預覽' : '切換至夜晚預覽';
-  });
-  debugHurtButton.addEventListener('click', () => {
-    unlockGameSounds();
-    showHurtEffect(HEALTH_UNIT);
-  });
-  debugFullHungerButton.addEventListener('click', () => {
-    hunger = MAX_HUNGER;
-    renderHunger();
-    healFromFullHunger();
-  });
-  debugCloudCountButton.addEventListener('click', () => {
-    const currentCount = debugCloudCount ?? cloudLayer.childElementCount;
-    debugCloudCount = (currentCount + 1) % 10;
-    renderClouds(debugCloudCount);
-    debugCloudCountButton.textContent = `改雲數量：${debugCloudCount}`;
-  });
-  debugDeathButton.addEventListener('click', () => {
-    unlockGameSounds();
-    health = 0;
-    renderHealth();
-    triggerDeath('調試專區觸發了死亡');
-  });
-  debugFoodApplyButton.addEventListener('click', () => {
-    const amount = Number.parseInt(debugFoodAmount.value.trim(), 10);
-    if (!Number.isInteger(amount) || amount === 0) return;
-    const type = debugFoodType.value;
-    foodInventory[type] = Math.max(0, Math.min(FOOD_MAX_QUANTITY, foodInventory[type] + amount));
-    saveFoodInventory();
-    updateFoodPicker();
-  });
-  debugFoodClearButton.addEventListener('click', () => {
-    foodInventory[debugFoodType.value] = 0;
-    saveFoodInventory();
-    updateFoodPicker();
-  });
-})();
 
 restartButton.addEventListener('click', restartGame);
 
