@@ -73,6 +73,7 @@ body.feeding-mode .pet { pointer-events: none; }
 .adventure-menu { position: fixed; z-index: 80; inset: 0; display: grid; grid-template-rows: auto 1fr; gap: clamp(18px, 4vh, 42px); padding: max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left)); background: #b9e8f7; color: #111; visibility: hidden; opacity: 0; pointer-events: none; transition: opacity .2s ease, visibility 0s linear .2s; }
 body.adventure-menu-open .adventure-menu { visibility: visible; opacity: 1; pointer-events: auto; transition-delay: 0s; }
 body.adventure-menu-open .world > :not(.adventure-menu) { visibility: hidden; pointer-events: none; }
+body.adventure-menu-open .world > .hud { z-index: 81; visibility: visible; opacity: 1; pointer-events: none; }
 .adventure-menu-header { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
 .adventure-menu h1 { margin: 0; font-size: clamp(26px, 5vw, 46px); letter-spacing: .06em; }
 .adventure-menu-header button, .adventure-card { border: 2px solid #111; border-radius: 4px; background: #fff; color: #111; font: inherit; cursor: pointer; }
@@ -87,13 +88,14 @@ body.adventure-menu-open .world > :not(.adventure-menu) { visibility: hidden; po
 .adventure-card.is-locked { opacity: .56; cursor: not-allowed; }
 .catch-game { position: fixed; z-index: 90; inset: 0; overflow: hidden; visibility: hidden; opacity: 0; pointer-events: none; background: #80d2ef; transition: opacity .2s ease, visibility 0s linear .2s; touch-action: none; }
 body.catch-mode .catch-game { visibility: visible; opacity: 1; pointer-events: auto; transition-delay: 0s; }
+body.catch-mode .world > .hud { z-index: 91; visibility: visible; opacity: 1; pointer-events: none; }
 .catch-sky { position: absolute; inset: 0 0 20%; background: #80d2ef; }
 .catch-ground { position: absolute; inset: 80% 0 0; background: #5bad4a; border-top: 8px solid #93d878; }
 .catch-field { position: absolute; inset: 0; overflow: hidden; }
 .catch-hud { position: absolute; z-index: 3; top: max(16px, env(safe-area-inset-top)); left: max(16px, env(safe-area-inset-left)); display: flex; align-items: center; gap: 14px; padding: 10px 14px; border-radius: 4px; background: #fff; color: #111; font-size: clamp(18px, 3vw, 28px); font-weight: 900; }
 .catch-score { display: inline-flex; align-items: center; gap: 8px; min-width: 62px; }
 .catch-score .food-art { transform: scale(1.15); }
-.catch-close { position: absolute; z-index: 3; top: max(16px, env(safe-area-inset-top)); right: max(16px, env(safe-area-inset-right)); min-width: 88px; min-height: 44px; padding: 8px 16px; border: 0; border-radius: 4px; background: #e44242; color: #fff; font: inherit; font-weight: 900; cursor: pointer; }
+.catch-close { position: absolute; z-index: 3; top: calc(max(16px, env(safe-area-inset-top)) + 64px); left: max(16px, env(safe-area-inset-left)); min-width: 88px; min-height: 44px; padding: 8px 16px; border: 0; border-radius: 4px; background: #e44242; color: #fff; font: inherit; font-weight: 900; cursor: pointer; }
 .catch-close:focus-visible { outline: 3px solid #111; outline-offset: 4px; }
 .catch-penguin { position: absolute; z-index: 2; left: 50%; bottom: 9%; width: clamp(105px, 14vw, 175px); padding: 0; transform: translateX(-50%); border: 0; background: transparent; cursor: grab; touch-action: none; }
 .catch-penguin img { display: block; width: 100%; filter: drop-shadow(0 8px 4px #2f673355); pointer-events: none; }
@@ -107,7 +109,7 @@ body.catch-mode .catch-game { visibility: visible; opacity: 1; pointer-events: a
 .catch-explosion::before, .catch-explosion::after { content: ""; position: absolute; display: block; border-radius: 50%; background: #e95131; }
 .catch-explosion::before { width: 20px; height: 20px; left: 3px; top: 22px; box-shadow: 47px 2px 0 #e95131, 21px -17px 0 #f58a35; }
 .catch-explosion::after { width: 14px; height: 14px; left: 29px; bottom: -3px; box-shadow: -16px -1px 0 #f06a32, 18px 0 #f06a32; }
-.catch-help { position: absolute; z-index: 3; bottom: 2%; left: 50%; margin: 0; transform: translateX(-50%); color: #111; font-size: clamp(11px, 1.7vw, 15px); font-weight: 800; text-align: center; white-space: nowrap; }
+.catch-help { position: absolute; z-index: 3; bottom: max(8px, env(safe-area-inset-bottom)); left: 50%; width: max-content; max-width: none; margin: 0; transform: translateX(-50%); color: #111; font-size: clamp(9px, 1.7vw, 15px); font-weight: 800; text-align: center; white-space: nowrap; }
 @keyframes catch-fall { from { transform: translateY(-70px) rotate(0deg); } to { transform: translateY(110vh) rotate(360deg); } }
 @keyframes catch-explosion { 0% { opacity: 0; transform: translate(-50%, -45%) scale(.25); } 22% { opacity: 1; transform: translate(-50%, -50%) scale(.9); } 100% { opacity: 0; transform: translate(-50%, -54%) scale(1.08); } }
 .food-picker, .interaction-picker { display: none; grid-template-columns: repeat(2, minmax(72px, 1fr)); gap: 7px; }
@@ -265,7 +267,7 @@ body.debug-force-day { background: #8ed7f4; } body.debug-force-day .sky { backgr
   .adventure-card { padding: 8px; gap: 5px; }
   .adventure-card small { font-size: 10px; }
   .catch-penguin { width: 118px; bottom: 8%; }
-  .catch-help { bottom: 1%; max-width: calc(100vw - 24px); white-space: normal; }
+  .catch-help { bottom: max(8px, env(safe-area-inset-bottom)); max-width: none; white-space: nowrap; }
 }
 
 @media (max-width: 380px) {
