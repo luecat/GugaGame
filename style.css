@@ -67,7 +67,7 @@ body.feeding-mode .pet { pointer-events: none; }
 .debug-panel { left: 18px; } .feature-panel { right: 18px; }
 .settings-menu .debug-panel { position: static; z-index: auto; padding: 0; border-radius: 0; background: transparent; }
 .settings-menu .debug-panel > span { display: block; }
-.debug-panel button, .feature-panel button { padding: 7px 9px; border: 0; border-radius: 6px; background: #38515b; color: white; cursor: pointer; font: inherit; }
+.debug-panel button, .feature-panel button { padding: 7px 9px; border: 0; border-radius: 6px; background: #38515b; color: white; cursor: pointer; font: inherit; touch-action: manipulation; }
 .feature-panel button { display: flex; align-items: center; justify-content: center; gap: 5px; } .feature-panel button svg { width: 15px; height: 15px; fill: #ef6f71; stroke: #ef6f71; stroke-width: 1.5; }
 .feature-actions { display: grid; grid-template-columns: repeat(2, minmax(72px, 1fr)); gap: 7px; }
 .adventure-menu { position: fixed; z-index: 80; inset: 0; display: grid; grid-template-rows: auto 1fr; gap: clamp(18px, 4vh, 42px); padding: max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left)); background: #b9e8f7; color: #111; visibility: hidden; opacity: 0; pointer-events: none; transition: opacity .2s ease, visibility 0s linear .2s; }
@@ -203,6 +203,7 @@ body.singing-song-playing .pet img { transform: translateY(var(--singing-lift, 0
 .food-art-stone { width: 31px; height: 25px; margin-top: 3px; border-radius: 46% 54% 42% 58% / 58% 45% 55% 42%; background: linear-gradient(145deg, #aeb8bb 0 30%, #7c898e 31% 72%, #657278 73%); box-shadow: inset 4px 3px 0 #ffffff38, inset -4px -3px 0 #34474f38; transform: rotate(-5deg); }
 .food-art-stone::after { content: ""; position: absolute; left: 8px; top: 7px; width: 9px; height: 4px; border-radius: 50%; background: #d4dcdd73; transform: rotate(-18deg); }
 .feeding-item { position: absolute; z-index: 8; display: grid; place-items: center; width: 58px; height: 58px; padding: 0; border: 0; border-radius: 50%; background: #ffffff70; box-shadow: 0 8px 18px #38515b38; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; line-height: 1; filter: drop-shadow(0 5px 3px #38515b38); }
+body:not(.feeding-mode) .feeding-item { display: none; }
 .feeding-item .food-art { transform: scale(1.45); }
 .feeding-item .food-art-stone { transform: scale(1.45) rotate(-5deg); }
 .feeding-item.dragging { cursor: grabbing; transform: scale(1.08); }
