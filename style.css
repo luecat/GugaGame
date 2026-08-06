@@ -109,7 +109,8 @@ body.catch-mode .catch-game { visibility: visible; opacity: 1; pointer-events: a
 @keyframes catch-explosion { 0% { opacity: 0; transform: translate(-50%, -45%) scale(.25); } 22% { opacity: 1; transform: translate(-50%, -50%) scale(.9); } 100% { opacity: 0; transform: translate(-50%, -54%) scale(1.08); } }
 .food-picker, .interaction-picker { display: none; grid-template-columns: repeat(2, minmax(72px, 1fr)); gap: 7px; }
 .food-empty-hint { margin: 0; color: #38515b; font-size: 11px; font-weight: 800; line-height: 1.35; text-align: center; }
-body:not(.feeding-mode) .food-empty-hint { display: none; }
+.food-empty-hint { display: none; }
+body:not(.feeding-mode):not(.interaction-mode) .food-empty-hint:not([hidden]) { display: block; }
 body.feeding-mode .food-picker { display: grid; }
 body.feeding-mode #feed-button { background: #b45b5b; }
 body.feeding-mode .feature-actions { grid-template-columns: 1fr; }
