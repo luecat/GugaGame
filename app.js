@@ -125,17 +125,24 @@ let genshinSoundPlayed = false;
 let lockedCloudCount = null;
 const VOLUME_STORAGE_KEY = 'gugagame-web-volume';
 const FOOD_STORAGE_KEY = 'gugagame-food-inventory';
+const FOOD_STORAGE_VERSION_KEY = 'gugagame-food-inventory-version';
+const FOOD_STORAGE_VERSION = 'catch-rewards-v1';
 const FOOD_MAX_QUANTITY = 99;
 const FOOD_TYPES = ['apple', 'stone'];
 
 function readFoodInventory() {
-  const defaults = Object.fromEntries(FOOD_TYPES.map((type) => [type, FOOD_MAX_QUANTITY]));
+  const defaults = Object.fromEntries(FOOD_TYPES.map((type) => [type, 0]));
   try {
+    if (window.localStorage.getItem(FOOD_STORAGE_VERSION_KEY) !== FOOD_STORAGE_VERSION) {
+      window.localStorage.setItem(FOOD_STORAGE_VERSION_KEY, FOOD_STORAGE_VERSION);
+      window.localStorage.setItem(FOOD_STORAGE_KEY, JSON.stringify(defaults));
+      return defaults;
+    }
     const stored = JSON.parse(window.localStorage.getItem(FOOD_STORAGE_KEY) || 'null');
     if (!stored || typeof stored !== 'object') return defaults;
     return Object.fromEntries(FOOD_TYPES.map((type) => {
       const value = Number(stored[type]);
-      return [type, Number.isFinite(value) ? Math.max(0, Math.min(FOOD_MAX_QUANTITY, Math.floor(value))) : FOOD_MAX_QUANTITY];
+      return [type, Number.isFinite(value) ? Math.max(0, Math.min(FOOD_MAX_QUANTITY, Math.floor(value))) : 0];
     }));
   } catch {
     return defaults;
@@ -146,6 +153,7 @@ let foodInventory = readFoodInventory();
 
 function saveFoodInventory() {
   try {
+    window.localStorage.setItem(FOOD_STORAGE_VERSION_KEY, FOOD_STORAGE_VERSION);
     window.localStorage.setItem(FOOD_STORAGE_KEY, JSON.stringify(foodInventory));
   } catch {}
 }
@@ -907,6 +915,14 @@ function showCatchExplosion(item) {
   explosion.style.top = `${item.y + 27}px`;
   catchField.append(explosion);
   explosion.addEventListener('animationend', () => explosion.remove(), { once: true });
+}
+
+function settleCatchRewards() {
+  if (catchApplesCount === 0 && catchStonesCount === 0) return;
+  foodInventory.apple = Math.min(FOOD_MAX_QUANTITY, foodInventory.apple + catchApplesCount);
+  foodInventory.stone = Math.min(FOOD_MAX_QUANTITY, foodInventory.stone + catchStonesCount);
+  saveFoodInventory();
+  updateFoodPicker();
 }
 
 function catchGameFrame(timestamp) {
@@ -1790,6 +1806,7 @@ adventureButton.addEventListener('touchstart', openAdventureMenu, { passive: fal
 closeAdventureMenuButton.addEventListener('click', () => setAdventureMenu(false));
 adventureMenu.querySelector('[data-adventure-game="catch"]').addEventListener('click', () => setCatchMode(true));
 closeCatchGameButton.addEventListener('click', () => {
+  settleCatchRewards();
   setCatchMode(false);
   setAdventureMenu(true);
 });
