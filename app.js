@@ -983,7 +983,7 @@ function setCatchMode(enabled) {
   isAdventureMenuOpen = false;
   document.body.classList.remove('adventure-menu-open');
   adventureMenu.inert = true;
-  setFeedingMode(false); setInteractionMode(false); setSingingMode(false); setRpsMode(false); setBallMode(false);
+  setFeedingMode(false); setInteractionMode(false); setSingingMode(false); setRpsMode(false); setBallMode(false); setHideAndSeekMode(false);
   walking = false;
   pet.classList.remove('walking');
   catchApplesCount = 0; catchStonesCount = 0; renderCatchScore();
@@ -1002,7 +1002,7 @@ function setAdventureMenu(enabled) {
   adventureMenu.inert = !enabled;
   adventureMenu.setAttribute('aria-hidden', String(!enabled));
   if (enabled) {
-    setFeedingMode(false); setInteractionMode(false); setSingingMode(false); setRpsMode(false); setBallMode(false);
+    setFeedingMode(false); setInteractionMode(false); setSingingMode(false); setRpsMode(false); setBallMode(false); setHideAndSeekMode(false);
     walking = false;
     pet.classList.remove('walking');
   }
@@ -1096,6 +1096,9 @@ function setHideAndSeekMode(enabled) {
   setFeedingMode(false);
   setSingingMode(false);
   setRpsMode(false);
+  setBallMode(false);
+  setCatchMode(false);
+  setAdventureMenu(false);
   walking = false;
   pet.classList.remove('walking');
   unlockGameSounds();
