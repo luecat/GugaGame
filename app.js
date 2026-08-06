@@ -878,7 +878,8 @@ function moveCatchPenguin(clientX) {
 
 function spawnCatchItem() {
   if (!isCatchMode) return;
-  const type = Math.random() < .44 ? 'apple' : (Math.random() < .7 ? 'stone' : 'bomb');
+  const roll = Math.random();
+  const type = roll < .7 ? 'apple' : (roll < .9 ? 'bomb' : 'stone');
   const item = document.createElement('div');
   item.className = `catch-item catch-item-${type}`;
   item.setAttribute('aria-hidden', 'true');
