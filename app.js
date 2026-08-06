@@ -90,7 +90,7 @@ let catchApplesCount = 0;
 let catchStonesCount = 0;
 const catchItems = new Set();
 const catchGameState = { lastTime: 0, penguinX: .5 };
-let catchPenguinPointerId = null;
+let catchControlPointerId = null;
 let isHideAndSeekMode = false;
 let isHideAndSeekRunning = false;
 let hideGameRevealTimer;
@@ -868,9 +868,12 @@ function renderCatchScore() {
 function moveCatchPenguin(clientX) {
   const fieldRect = catchField.getBoundingClientRect();
   const penguinWidth = catchPenguin.offsetWidth;
-  const nextLeft = Math.max(0, Math.min(fieldRect.width - penguinWidth, clientX - fieldRect.left - penguinWidth / 2));
-  catchPenguin.style.left = `${nextLeft}px`;
-  catchGameState.penguinX = (nextLeft + penguinWidth / 2) / fieldRect.width;
+  const minCenter = penguinWidth / 2;
+  const maxCenter = fieldRect.width - penguinWidth / 2;
+  const centerX = Math.max(minCenter, Math.min(maxCenter, clientX - fieldRect.left));
+  // The CSS translate keeps this value at the visual center of the penguin image.
+  catchPenguin.style.left = `${centerX}px`;
+  catchGameState.penguinX = centerX / fieldRect.width;
 }
 
 function spawnCatchItem() {
@@ -972,25 +975,27 @@ function setAdventureMenu(enabled) {
   }
 }
 
-catchPenguin.addEventListener('pointerdown', (event) => {
+catchGame.addEventListener('pointerdown', (event) => {
+  if (!isCatchMode || event.target.closest('.catch-close')) return;
+  event.preventDefault();
+  catchControlPointerId = event.pointerId;
+  catchGame.setPointerCapture?.(event.pointerId);
+  moveCatchPenguin(event.clientX);
+});
+catchGame.addEventListener('pointermove', (event) => {
   if (!isCatchMode) return;
-  event.preventDefault();
-  catchPenguinPointerId = event.pointerId;
-  catchPenguin.setPointerCapture?.(event.pointerId);
-  moveCatchPenguin(event.clientX);
-});
-catchPenguin.addEventListener('pointermove', (event) => {
-  if (!isCatchMode || event.pointerId !== catchPenguinPointerId) return;
+  const isMouseHover = event.pointerType === 'mouse' && event.buttons === 0;
+  if (!isMouseHover && event.pointerId !== catchControlPointerId) return;
   event.preventDefault();
   moveCatchPenguin(event.clientX);
 });
-function endCatchPenguinDrag(event) {
-  if (event.pointerId !== catchPenguinPointerId) return;
-  catchPenguinPointerId = null;
-  if (catchPenguin.hasPointerCapture?.(event.pointerId)) catchPenguin.releasePointerCapture(event.pointerId);
+function endCatchControl(event) {
+  if (event.pointerId !== catchControlPointerId) return;
+  catchControlPointerId = null;
+  if (catchGame.hasPointerCapture?.(event.pointerId)) catchGame.releasePointerCapture(event.pointerId);
 }
-catchPenguin.addEventListener('pointerup', endCatchPenguinDrag);
-catchPenguin.addEventListener('pointercancel', endCatchPenguinDrag);
+catchGame.addEventListener('pointerup', endCatchControl);
+catchGame.addEventListener('pointercancel', endCatchControl);
 document.addEventListener('keydown', (event) => {
   if (!isCatchMode || !['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
   event.preventDefault();
