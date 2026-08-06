@@ -1,3 +1,4 @@
+/* TEST-ONLY SCP MODULE: rhythm-game test styles. */
 :root { color: #f7fbff; background: #080d18; font-family: ui-rounded, "SF Pro Rounded", "PingFang TC", system-ui, sans-serif; }
 * { box-sizing: border-box; }
 html, body { width: 100%; min-height: 100%; margin: 0; overflow: hidden; }

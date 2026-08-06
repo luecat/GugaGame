@@ -13,6 +13,8 @@
     <title>Gugagame</title>
     <link rel="preload" as="image" href="image/gugugaga-sing.png?v=20260803-13" />
     <link rel="stylesheet" href="style.css?v=20260807-food-rarity4" />
+    <!-- TEST-ONLY DEBUG MODULE: omit this stylesheet and its matching markup/script in production. -->
+    <link rel="stylesheet" href="test-only/debug/debug-tools.css?v=20260807-1" />
   </head>
   <body>
     <main class="world" aria-label="企鵝的草地">
@@ -35,7 +37,8 @@
             </svg>
           </div>
         </div>
-        <section class="debug-panel" aria-label="調試專區">
+        <!-- TEST-ONLY DEBUG MODULE START -->
+        <section id="debug-tools" class="debug-panel" data-test-module="debug-tools" aria-label="調試專區">
           <span>調試專區</span>
           <button id="debug-day-night" type="button">切換晝夜預覽</button>
           <button id="debug-hurt" type="button">扣血測試</button>
@@ -52,6 +55,7 @@
           <button id="debug-food-apply" type="button">套用數量變更</button>
           <button id="debug-food-clear" type="button">清空數量</button>
         </section>
+        <!-- TEST-ONLY DEBUG MODULE END -->
       </section>
       <div class="sky" aria-hidden="true">
         <svg class="celestial sun" viewBox="0 0 100 100" role="presentation"><circle cx="50" cy="50" r="22" /><path d="M50 5v15M50 80v15M5 50h15M80 50h15M18 18l11 11M71 71l11 11M82 18 71 29M29 71 18 82" /></svg>
@@ -189,6 +193,8 @@
         </div>
       </section>
     </main>
-    <script src="app.js?v=20260806-adventure-death2"></script>
+    <!-- TEST-ONLY DEBUG MODULE: defines the UI controller consumed by app.js. -->
+    <script src="test-only/debug/debug-tools.js?v=20260807-1"></script>
+    <script src="app.js?v=20260807-test-module-boundary1"></script>
   </body>
 </html>

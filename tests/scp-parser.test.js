@@ -1,3 +1,4 @@
+/* TEST-ONLY SCP MODULE: parser regression tests. */
 'use strict';
 
 const assert = require('node:assert/strict');
