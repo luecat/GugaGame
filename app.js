@@ -330,7 +330,13 @@ function isSettingsOpen() {
 }
 
 function canPlayGenshinSound() {
-  return walking && !isSettingsOpen() && !isFeedingMode && !isInteractionMode && !isSingingMode && !isRpsMode && !isRpsResolving && !isBallMode && !isDead && !isDragging && !isFalling;
+  return walking && !isSettingsOpen() && !isFeedingMode && !isInteractionMode && !isSingingMode && !isRpsMode && !isRpsResolving && !isBallMode && !isAdventureMenuOpen && !isCatchMode && !isMiningMode && !isHideAndSeekMode && !isDead && !isDragging && !isFalling;
+}
+
+function stopGenshinOutsideMain() {
+  stopSound(genshinSound);
+  genshinSoundPending = false;
+  lockedCloudCount = null;
 }
 
 function maybePlayGenshinSound(count) {
@@ -394,6 +400,7 @@ function scheduleNextCloudUpdate() {
 function toggleSettings() {
   const isOpen = document.body.classList.toggle('settings-open');
   if (isOpen) {
+    stopGenshinOutsideMain();
     setFeedingMode(false);
     setInteractionMode(false);
     setSingingMode(false);
@@ -557,6 +564,7 @@ function setFeedingMode(enabled) {
   feedButtonLabel.textContent = enabled ? '結束餵食' : '餵食';
 
   if (enabled) {
+    stopGenshinOutsideMain();
     if (clickTimer) {
       window.clearTimeout(clickTimer);
       clickTimer = undefined;
@@ -588,6 +596,7 @@ function setInteractionMode(enabled) {
   interactButton.setAttribute('aria-pressed', String(enabled));
   interactButton.setAttribute('aria-label', enabled ? '結束互動選單' : '與企鵝互動');
   interactButtonLabel.textContent = enabled ? '取消互動' : '互動';
+  if (enabled) stopGenshinOutsideMain();
 }
 
 function setRpsMode(enabled) {
@@ -598,6 +607,7 @@ function setRpsMode(enabled) {
   rpsPicker.setAttribute('aria-hidden', String(!enabled));
   rpsResult.setAttribute('aria-hidden', String(!enabled));
   if (enabled) {
+    stopGenshinOutsideMain();
     setInteractionMode(false);
     walking = false;
     pet.classList.remove('walking');
@@ -745,6 +755,7 @@ function setSingingMode(enabled) {
   singingPicker.setAttribute('aria-hidden', String(!enabled));
   petImage.src = enabled ? singingPetImageSource : normalPetImageSource;
   petImage.alt = enabled ? '唱歌中的企鵝' : '企鵝';
+  if (enabled) stopGenshinOutsideMain();
   if (!enabled) {
     stopSound(singingSound);
     stopSingingWaveAnimation();
@@ -888,8 +899,7 @@ function setBallMode(enabled) {
   walking = false; pet.classList.remove('walking');
   resizeBallCourt();
   ballPlay.playerX = ballPlay.width * .5; ballPlay.penguinX = ballPlay.width * .5; ballPlay.pausedUntil = 0;
-  stopSound(genshinSound);
-  genshinSoundPending = false;
+  stopGenshinOutsideMain();
   ballCombo = 0;
   ballComboValue.textContent = '0';
   resetBallServe(); ballPlay.lastTime = performance.now(); ballPlay.frame = window.requestAnimationFrame(ballGameFrame);
@@ -1015,6 +1025,7 @@ function setCatchMode(enabled) {
     clearCatchItems();
     return;
   }
+  stopGenshinOutsideMain();
   isAdventureMenuOpen = false;
   document.body.classList.remove('adventure-menu-open');
   adventureMenu.inert = true;
@@ -1037,6 +1048,7 @@ function setAdventureMenu(enabled) {
   adventureMenu.inert = !enabled;
   adventureMenu.setAttribute('aria-hidden', String(!enabled));
   if (enabled) {
+    stopGenshinOutsideMain();
     setFeedingMode(false); setInteractionMode(false); setSingingMode(false); setRpsMode(false); setBallMode(false);
     walking = false;
     pet.classList.remove('walking');
@@ -1120,6 +1132,7 @@ function setMiningMode(enabled) {
   miningGame.setAttribute('aria-hidden', String(!enabled));
   clearMiningTimers();
   if (!enabled) return;
+  stopGenshinOutsideMain();
   isAdventureMenuOpen = false; document.body.classList.remove('adventure-menu-open'); adventureMenu.inert = true;
   setFeedingMode(false); setInteractionMode(false); setSingingMode(false); setRpsMode(false); setBallMode(false); setCatchMode(false);
   walking = false; pet.classList.remove('walking');
@@ -1158,7 +1171,7 @@ function mineRock(rock) {
       hunger = Math.max(0, hunger - MINING_HUNGER_COST); renderHunger();
       showMiningResult('挖到石頭了！', 'is-success');
       if (miningIsTired()) showMiningTiredAndExit(950);
-    } else showMiningResult('鎬子太爛了，挖到滾木了！', 'is-fail');
+    } else showMiningResult('鎬子太爛了\n挖到滾木了！', 'is-fail');
   }, 430);
 }
 
@@ -1247,6 +1260,7 @@ function setHideAndSeekMode(enabled) {
     resetHideGameBoard();
     return;
   }
+  stopGenshinOutsideMain();
   setInteractionMode(false);
   setFeedingMode(false);
   setSingingMode(false);
@@ -1908,6 +1922,7 @@ function stopSound(sound) {
 function triggerDeath(cause = '企鵝失去了所有血量') {
   if (isDead) return;
   isDead = true;
+  stopGenshinOutsideMain();
   setCatchMode(false);
   setHideAndSeekMode(false);
   setFeedingMode(false);
