@@ -49,6 +49,9 @@ const miningRocks = document.querySelector('#mining-rocks');
 const miningPenguin = document.querySelector('#mining-penguin');
 const miningPenguinImage = document.querySelector('#mining-penguin-image');
 const miningPickStatus = document.querySelector('#mining-pick-status');
+const miningPickRoll = document.querySelector('#mining-pick-roll');
+const miningPickRollImage = document.querySelector('#mining-pick-roll-image');
+const miningPickRollName = document.querySelector('#mining-pick-roll-name');
 const miningResult = document.querySelector('#mining-result');
 const closeMiningGameButton = document.querySelector('#close-mining-game');
 const hideAndSeekButton = document.querySelector('#hide-and-seek-button');
@@ -103,10 +106,13 @@ let catchControlPointerId = null;
 let isMiningMode = false;
 let miningPick = null;
 let miningPickTimer;
+let miningRollInterval;
 let miningResultTimer;
 let miningHoldTimer;
 let miningPointerId = null;
 let miningTargetRock = null;
+let miningPointerStartX = 0;
+let miningPointerStartY = 0;
 let isHideAndSeekMode = false;
 let isHideAndSeekRunning = false;
 let hideGameRevealTimer;
@@ -305,10 +311,10 @@ const MINING_HUNGER_COST = 1;
 const MINING_MIN_HUNGER = MAX_HUNGER * .35;
 const MINING_HOLD_MS = 550;
 const MINING_PICKS = [
-  { id: 'diamond', name: '鑽石鎬', chance: 1, image: 'image/gugugaga_鑽石.png' },
-  { id: 'iron', name: '鐵鎬', chance: .75, image: 'image/gugugaga＿鐵鎬.png' },
-  { id: 'stone', name: '石鎬', chance: .5, image: 'image/gugugaga＿石鎬.png' },
-  { id: 'wood', name: '木鎬', chance: .25, image: 'image/gugugaga_木鎬.png' },
+  { id: 'diamond', name: '鑽石鎬', chance: 1, image: 'image/gugugaga_鑽石.png', pickImage: 'image/鑽石鎬.png' },
+  { id: 'iron', name: '鐵鎬', chance: .75, image: 'image/gugugaga＿鐵鎬.png', pickImage: 'image/鐵鎬.png' },
+  { id: 'stone', name: '石鎬', chance: .5, image: 'image/gugugaga＿石鎬.png', pickImage: 'image/石鎬.png' },
+  { id: 'wood', name: '木鎬', chance: .25, image: 'image/gugugaga_木鎬.png', pickImage: 'image/木鎬.webp' },
 ];
 const USE_IOS_TOUCH_DRAG = /iPad|iPhone|iPod/.test(navigator.userAgent)
   || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -1035,8 +1041,9 @@ function setAdventureMenu(enabled) {
 }
 
 function clearMiningTimers() {
-  window.clearTimeout(miningPickTimer); window.clearTimeout(miningResultTimer); window.clearTimeout(miningHoldTimer);
-  miningPickTimer = miningResultTimer = miningHoldTimer = undefined;
+  window.clearTimeout(miningPickTimer); window.clearTimeout(miningResultTimer); window.clearTimeout(miningHoldTimer); window.clearInterval(miningRollInterval);
+  miningPickTimer = miningResultTimer = miningHoldTimer = miningRollInterval = undefined;
+  miningPickRoll.classList.remove('is-visible', 'is-finished');
 }
 
 function miningIsTired() { return hunger < MINING_MIN_HUNGER; }
@@ -1055,7 +1062,7 @@ function renderMiningRocks() {
     rock.type = 'button'; rock.className = 'mining-rock'; rock.dataset.rock = String(index);
     rock.style.setProperty('--rock-x', `${x}%`); rock.style.setProperty('--rock-y', `${y}%`); rock.style.setProperty('--rock-size', `${size}px`);
     rock.setAttribute('aria-label', '長按石頭挖掘');
-    const image = document.createElement('img'); image.src = 'image/石頭.png'; image.alt = ''; image.draggable = false; rock.append(image);
+    const stone = document.createElement('span'); stone.className = 'food-art food-art-stone'; stone.setAttribute('aria-hidden', 'true'); rock.append(stone);
     return rock;
   }));
 }
@@ -1063,20 +1070,33 @@ function renderMiningRocks() {
 function chooseMiningPick() {
   miningPick = null;
   miningPickStatus.textContent = '正在抽選鎬子…';
-  miningPenguin.classList.add('is-rolling');
+  miningPickRoll.classList.remove('is-finished');
+  miningPickRoll.classList.add('is-visible');
   let tick = 0;
-  const roll = window.setInterval(() => {
+  miningRollInterval = window.setInterval(() => {
     const preview = MINING_PICKS[tick++ % MINING_PICKS.length];
-    miningPenguinImage.src = preview.image; miningPickStatus.textContent = `正在抽選：${preview.name}`;
-  }, 110);
+    miningPickRollImage.src = preview.pickImage;
+    miningPickRollImage.alt = preview.name;
+    miningPickRollName.textContent = preview.name;
+    miningPenguinImage.src = preview.image;
+    miningPickStatus.textContent = `正在抽選：${preview.name}`;
+  }, 135);
   miningPickTimer = window.setTimeout(() => {
-    window.clearInterval(roll);
+    window.clearInterval(miningRollInterval);
+    miningRollInterval = undefined;
     miningPick = MINING_PICKS[Math.floor(Math.random() * MINING_PICKS.length)];
     miningPenguinImage.src = miningPick.image;
+    miningPickRollImage.src = miningPick.pickImage;
+    miningPickRollImage.alt = miningPick.name;
+    miningPickRollName.textContent = miningPick.name;
     miningPickStatus.textContent = `本次鎬子：${miningPick.name}（掉落率 ${miningPick.chance * 100}%）`;
-    miningPenguin.classList.remove('is-rolling');
+    miningPickRoll.classList.add('is-finished');
+    miningPickTimer = window.setTimeout(() => {
+      miningPickTimer = undefined;
+      miningPickRoll.classList.remove('is-visible', 'is-finished');
+    }, 850);
     if (miningIsTired()) showMiningResult('你的企鵝累了，回去休息吧', 'is-tired');
-  }, 1050);
+  }, 1600);
 }
 
 function setMiningMode(enabled) {
@@ -1096,8 +1116,8 @@ function setMiningMode(enabled) {
 
 function moveMiningPenguin(clientX, clientY) {
   const rect = miningField.getBoundingClientRect();
-  const x = Math.max(7, Math.min(93, ((clientX - rect.left) / rect.width) * 100));
-  const y = Math.max(28, Math.min(80, ((clientY - rect.top) / rect.height) * 100));
+  const x = Math.max(6, Math.min(94, ((clientX - rect.left) / rect.width) * 100));
+  const y = Math.max(12, Math.min(90, ((clientY - rect.top) / rect.height) * 100));
   const legal = [...miningRocks.children].every((rock) => {
     const rockRect = rock.getBoundingClientRect(); const dx = clientX - (rockRect.left + rockRect.width / 2); const dy = clientY - (rockRect.top + rockRect.height / 2);
     return Math.hypot(dx, dy) > Math.max(rockRect.width, 72) * .72;
@@ -2097,11 +2117,17 @@ miningField.addEventListener('pointerdown', (event) => {
   if (!rock) { moveMiningPenguin(event.clientX, event.clientY); return; }
   event.preventDefault();
   miningPointerId = event.pointerId; miningTargetRock = rock;
+  miningPointerStartX = event.clientX; miningPointerStartY = event.clientY;
   miningField.setPointerCapture?.(event.pointerId);
   miningHoldTimer = window.setTimeout(() => {
     if (miningPointerId === event.pointerId && miningTargetRock === rock) mineRock(rock);
     miningHoldTimer = undefined;
   }, MINING_HOLD_MS);
+});
+miningField.addEventListener('pointermove', (event) => {
+  if (event.pointerId !== miningPointerId || miningHoldTimer === undefined) return;
+  if (Math.hypot(event.clientX - miningPointerStartX, event.clientY - miningPointerStartY) < 10) return;
+  window.clearTimeout(miningHoldTimer); miningHoldTimer = undefined;
 });
 function endMiningPointer(event) {
   if (event.pointerId !== miningPointerId) return;
@@ -2110,6 +2136,9 @@ function endMiningPointer(event) {
 }
 miningField.addEventListener('pointerup', endMiningPointer);
 miningField.addEventListener('pointercancel', endMiningPointer);
+miningField.addEventListener('contextmenu', (event) => event.preventDefault());
+miningField.addEventListener('selectstart', (event) => event.preventDefault());
+miningField.addEventListener('dragstart', (event) => event.preventDefault());
 
 feedButton.addEventListener('click', () => {
   if (isSettingsOpen() || isDead || isRpsResolving) return;
