@@ -1065,7 +1065,12 @@ function miningIsTired() { return hunger < MINING_MIN_HUNGER; }
 
 function showMiningResult(message, type = '') {
   window.clearTimeout(miningResultTimer);
-  miningResult.textContent = message;
+  miningResult.replaceChildren(...message.split('\n').map((line) => {
+    const resultLine = document.createElement('span');
+    resultLine.className = 'mining-result-line';
+    resultLine.textContent = line;
+    return resultLine;
+  }));
   miningResult.className = `mining-result is-visible ${type}`;
   miningResultTimer = window.setTimeout(() => { miningResult.className = 'mining-result'; }, 1800);
 }
