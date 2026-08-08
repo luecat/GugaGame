@@ -1171,7 +1171,7 @@ function mineRock(rock) {
       hunger = Math.max(0, hunger - MINING_HUNGER_COST); renderHunger();
       showMiningResult('挖到石頭了！', 'is-success');
       if (miningIsTired()) showMiningTiredAndExit(950);
-    } else showMiningResult('鎬子太爛了\n挖到滾木了！', 'is-fail');
+    } else showMiningResult('鎬子太爛\n挖到滾木了', 'is-fail');
   }, 430);
 }
 
