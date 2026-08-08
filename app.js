@@ -109,6 +109,7 @@ let miningPickTimer;
 let miningRollInterval;
 let miningResultTimer;
 let miningHoldTimer;
+let miningExitTimer;
 let miningPointerId = null;
 let miningTargetRock = null;
 let miningPointerStartX = 0;
@@ -1043,8 +1044,8 @@ function setAdventureMenu(enabled) {
 }
 
 function clearMiningTimers() {
-  window.clearTimeout(miningPickTimer); window.clearTimeout(miningResultTimer); window.clearTimeout(miningHoldTimer); window.clearInterval(miningRollInterval);
-  miningPickTimer = miningResultTimer = miningHoldTimer = miningRollInterval = undefined;
+  window.clearTimeout(miningPickTimer); window.clearTimeout(miningResultTimer); window.clearTimeout(miningHoldTimer); window.clearTimeout(miningExitTimer); window.clearInterval(miningRollInterval);
+  miningPickTimer = miningResultTimer = miningHoldTimer = miningExitTimer = miningRollInterval = undefined;
   miningPickRoll.classList.remove('is-visible', 'is-finished');
 }
 
@@ -1055,6 +1056,17 @@ function showMiningResult(message, type = '') {
   miningResult.textContent = message;
   miningResult.className = `mining-result is-visible ${type}`;
   miningResultTimer = window.setTimeout(() => { miningResult.className = 'mining-result'; }, 1800);
+}
+
+function showMiningTiredAndExit(delay = 0) {
+  window.clearTimeout(miningExitTimer);
+  miningExitTimer = window.setTimeout(() => {
+    showMiningResult('你的企鵝累了，回去休息吧', 'is-tired');
+    miningExitTimer = window.setTimeout(() => {
+      miningExitTimer = undefined;
+      setMiningMode(false);
+    }, 1500);
+  }, delay);
 }
 
 function renderMiningRocks() {
@@ -1097,7 +1109,6 @@ function chooseMiningPick() {
       miningPickTimer = undefined;
       miningPickRoll.classList.remove('is-visible', 'is-finished');
     }, 850);
-    if (miningIsTired()) showMiningResult('你的企鵝累了，回去休息吧', 'is-tired');
   }, 1600);
 }
 
@@ -1113,7 +1124,13 @@ function setMiningMode(enabled) {
   setFeedingMode(false); setInteractionMode(false); setSingingMode(false); setRpsMode(false); setBallMode(false); setCatchMode(false);
   walking = false; pet.classList.remove('walking');
   miningPenguin.style.left = '13%'; miningPenguin.style.top = '72%';
-  miningResult.className = 'mining-result'; renderMiningRocks(); chooseMiningPick();
+  miningResult.className = 'mining-result'; renderMiningRocks();
+  if (miningIsTired()) {
+    miningPickStatus.textContent = '飽食度不足';
+    showMiningTiredAndExit();
+    return;
+  }
+  chooseMiningPick();
 }
 
 function moveMiningPenguin(clientX, clientY) {
@@ -1129,7 +1146,8 @@ function moveMiningPenguin(clientX, clientY) {
 }
 
 function mineRock(rock) {
-  if (!isMiningMode || !miningPick || miningIsTired()) { showMiningResult('你的企鵝累了，回去休息吧', 'is-tired'); return; }
+  if (!isMiningMode || !miningPick) return;
+  if (miningIsTired()) { showMiningTiredAndExit(); return; }
   rock.classList.add('is-breaking');
   const gotStone = Math.random() < miningPick.chance;
   window.setTimeout(() => {
@@ -1139,9 +1157,7 @@ function mineRock(rock) {
       foodInventory.stone = Math.min(FOOD_MAX_QUANTITY, foodInventory.stone + 1); saveFoodInventory(); updateFoodPicker();
       hunger = Math.max(0, hunger - MINING_HUNGER_COST); renderHunger();
       showMiningResult('挖到石頭了！', 'is-success');
-      if (miningIsTired()) window.setTimeout(() => {
-        if (isMiningMode) showMiningResult('你的企鵝累了，回去休息吧', 'is-tired');
-      }, 950);
+      if (miningIsTired()) showMiningTiredAndExit(950);
     } else showMiningResult('鎬子太爛了，挖到滾木了！', 'is-fail');
   }, 430);
 }
