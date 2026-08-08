@@ -182,6 +182,33 @@ body.hide-and-seek-mode .hide-and-seek-game { visibility: visible; opacity: 1; p
 .hide-game-result { position: absolute; z-index: 5; top: 50%; left: 50%; width: 100%; margin: 0; color: #f2bd4a; font-size: clamp(56px, 13vw, 142px); font-weight: 1000; letter-spacing: .04em; line-height: .9; text-align: center; -webkit-text-stroke: clamp(2px, .45vw, 6px) #111; paint-order: stroke fill; filter: drop-shadow(-5px 2px 0 #fff); transform: translate(-50%, -50%) scale(.4); opacity: 0; pointer-events: none; }
 .hide-game-result.is-visible { animation: hide-result-pop .48s cubic-bezier(.18,.9,.32,1.22) both; }
 .hide-game-result.is-lost { color: #ef5c65; }
+.mining-game { position: fixed; z-index: 76; inset: 0; visibility: hidden; opacity: 0; pointer-events: none; overflow: hidden; background: #17110d; color: #fff4d3; transition: opacity .2s ease, visibility 0s linear .2s; }
+body.mining-mode .mining-game { visibility: visible; opacity: 1; pointer-events: auto; transition-delay: 0s; }
+.mining-toolbar { position: absolute; z-index: 8; inset: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) auto max(16px, env(safe-area-inset-left)); display: flex; align-items: center; justify-content: space-between; gap: 12px; pointer-events: none; }
+.mining-pick-status, .mining-toolbar button { border: 1px solid #f4d39266; border-radius: 8px; background: #21160fdf; box-shadow: 0 5px 16px #0008; font: inherit; font-size: clamp(14px, 2.4vw, 19px); font-weight: 900; }
+.mining-pick-status { padding: 10px 13px; }
+.mining-toolbar button { min-height: 42px; padding: 8px 14px; border-color: #d47b54; color: #fff; cursor: pointer; pointer-events: auto; }
+.mining-field { position: absolute; inset: 0; overflow: hidden; background: radial-gradient(ellipse at 50% 25%, #514035 0 2%, #211711 37%, #100b09 84%); isolation: isolate; touch-action: none; }
+.mining-field::before { content: ""; position: absolute; inset: 0; opacity: .53; background: linear-gradient(115deg, transparent 46%, #5c4637 47% 49%, transparent 50%) 0 0 / 120px 100%, linear-gradient(65deg, transparent 45%, #4b382d 46% 48%, transparent 49%) 0 0 / 150px 100%, repeating-linear-gradient(12deg, #0000 0 38px, #926b4d18 39px 42px); pointer-events: none; }
+.mining-shaft { position: absolute; z-index: 1; left: 50%; bottom: -8%; width: min(67vw, 590px); height: 75%; border: 17px solid #503524; border-bottom: 0; box-shadow: inset 0 0 0 7px #21150e, 0 0 45px #000b; transform: translateX(-50%) perspective(440px) rotateX(16deg); }
+.mining-shaft::before, .mining-shaft::after { content: ""; position: absolute; left: -17px; right: -17px; height: 18px; background: #79503a; box-shadow: inset 0 -5px #372116; }
+.mining-shaft::before { top: 21%; } .mining-shaft::after { top: 53%; }
+.mining-lantern { position: absolute; z-index: 4; top: 23%; width: 34px; height: 52px; border: 5px solid #6d4429; border-radius: 7px 7px 12px 12px; background: #d98536; box-shadow: 0 0 13px 7px #ee9e3c88, 0 0 85px 33px #d06a2252; }
+.mining-lantern::before { content: ""; position: absolute; left: 50%; bottom: 100%; width: 2px; height: 64px; background: #8b5a39; } .mining-lantern i { position: absolute; inset: 8px; border-radius: 4px; background: #ffe89c; box-shadow: 0 0 12px #fff4b9; }
+.mining-lantern-left { left: 13%; } .mining-lantern-right { right: 13%; top: 40%; }
+.mining-rocks { position: absolute; z-index: 5; inset: 0; }
+.mining-rock { position: absolute; left: var(--rock-x); top: var(--rock-y); width: var(--rock-size); padding: 0; border: 0; background: none; cursor: pointer; transform: translate(-50%, -50%); touch-action: none; }
+.mining-rock img { display: block; width: 100%; filter: drop-shadow(0 10px 5px #0009); user-select: none; }
+.mining-rock::after { content: ""; position: absolute; inset: 18%; opacity: 0; background: linear-gradient(55deg, transparent 46%, #fff7df 48% 51%, transparent 53%), linear-gradient(-48deg, transparent 45%, #fff7df 47% 50%, transparent 52%), linear-gradient(0deg, transparent 45%, #fff7df 47% 50%, transparent 52%); transition: opacity .1s; }
+.mining-rock.is-breaking { animation: mining-rock-shake .43s steps(2, end); } .mining-rock.is-breaking::after { opacity: 1; }
+.mining-penguin { position: absolute; z-index: 6; width: clamp(100px, 16vw, 170px); padding: 0; border: 0; background: none; cursor: default; transform: translate(-50%, -50%); transition: left .32s ease, top .32s ease; pointer-events: none; }
+.mining-penguin img { display: block; width: 100%; filter: drop-shadow(0 11px 5px #000a); } .mining-penguin.is-rolling img { animation: mining-pick-roll .11s linear infinite; }
+.mining-result { position: absolute; z-index: 9; left: 50%; top: 50%; width: min(88vw, 700px); margin: 0; color: #ffe48e; font-size: clamp(33px, 7vw, 76px); font-weight: 1000; line-height: .98; text-align: center; -webkit-text-stroke: 2px #211109; paint-order: stroke fill; text-shadow: 0 5px 0 #000; transform: translate(-50%, -50%) scale(.5); opacity: 0; pointer-events: none; }
+.mining-result.is-visible { animation: mining-result-pop .48s cubic-bezier(.18,.9,.32,1.22) both; } .mining-result.is-fail { color: #db936c; } .mining-result.is-tired { color: #d9c8b2; }
+.mining-help { position: absolute; z-index: 7; bottom: max(15px, env(safe-area-inset-bottom)); left: 50%; margin: 0; padding: 8px 13px; border-radius: 7px; background: #0d0908b8; color: #e5d2ae; font-size: clamp(12px, 2.3vw, 16px); font-weight: 800; transform: translateX(-50%); white-space: nowrap; pointer-events: none; }
+@keyframes mining-rock-shake { 0%, 100% { transform: translate(-50%, -50%); } 25% { transform: translate(calc(-50% - 5px), calc(-50% + 2px)); } 50% { transform: translate(calc(-50% + 5px), calc(-50% - 3px)); } 75% { transform: translate(calc(-50% - 3px), calc(-50% + 4px)); } }
+@keyframes mining-pick-roll { 50% { transform: rotate(-3deg) scale(1.025); filter: brightness(1.18) drop-shadow(0 11px 5px #000a); } }
+@keyframes mining-result-pop { to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
 .hide-penguin.hide-penguin-victory { animation: hide-victory-shake .92s cubic-bezier(.22,.8,.32,1) both; }
 .hide-penguin.hide-penguin-shocked { animation: hide-shocked-shake .78s ease-in-out both; }
 @keyframes hide-result-pop { to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
