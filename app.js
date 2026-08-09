@@ -405,18 +405,13 @@ volumeSlider.addEventListener('input', () => {
 });
 setGameVolume(gameVolume, false);
 
-copySaveCodeButton.addEventListener('click', async () => {
+copySaveCodeButton.addEventListener('click', () => {
   saveGameState();
   const code = encodeSaveCode();
   saveCodeField.value = code;
-  try {
-    await navigator.clipboard.writeText(code);
-    setSaveCodeStatus('存檔碼已複製。');
-  } catch {
-    saveCodeField.focus();
-    saveCodeField.select();
-    setSaveCodeStatus('存檔碼已產生，請自行複製。');
-  }
+  saveCodeField.focus();
+  saveCodeField.select();
+  setSaveCodeStatus('存檔碼已生成，可自行複製備份。');
 });
 
 importSaveCodeButton.addEventListener('click', () => {
@@ -2142,6 +2137,9 @@ function restartGame() {
   clickCount = 0;
   health = MAX_HEALTH;
   hunger = 6;
+  affection = 40;
+  foodInventory.apple = 0;
+  foodInventory.stone = 0;
   position = 42;
   stopSound(screamSound);
   stopSound(deathSound);
@@ -2158,6 +2156,8 @@ function restartGame() {
   renderHealth();
   renderHunger();
   renderAffection();
+  updateFoodPicker();
+  writeFoodInventory();
   saveGameState();
 }
 

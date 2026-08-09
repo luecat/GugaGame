@@ -20,8 +20,8 @@ body { margin: 0; overflow: hidden; overscroll-behavior: none; background: #8ed7
 .volume-control.is-muted .volume-muted-mark { display: block; }
 .save-setting { display: grid; gap: 8px; margin-bottom: 18px; padding-bottom: 17px; border-bottom: 1px solid #38515b2b; color: #38515b; }
 .save-setting > label { font-size: 13px; font-weight: 800; letter-spacing: .03em; }
-.save-setting textarea { width: 100%; min-height: 50px; resize: vertical; padding: 8px 10px; border: 1px solid #38515b66; border-radius: 8px; background: #ffffffc9; color: #243f4d; font: 700 13px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .04em; }
-.save-setting textarea:focus-visible, .save-setting button:focus-visible { outline: 3px solid #38515b; outline-offset: 2px; }
+.save-setting input { width: 100%; height: 50px; padding: 0 10px; border: 1px solid #38515b66; border-radius: 8px; background: #ffffffc9; color: #243f4d; font: 700 13px/50px ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .04em; text-align: left; }
+.save-setting input:focus-visible, .save-setting button:focus-visible { outline: 3px solid #38515b; outline-offset: 2px; }
 .save-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .save-setting button { min-height: 36px; padding: 7px 9px; border: 0; border-radius: 7px; background: #38515b; color: white; cursor: pointer; font: inherit; font-size: 12px; font-weight: 800; }
 .save-code-status { min-height: 1.35em; margin: 0; color: #38515b; font-size: 11px; font-weight: 700; line-height: 1.35; }

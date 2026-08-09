@@ -12,7 +12,7 @@
     <meta property="og:type" content="website" />
     <title>Gugagame</title>
     <link rel="preload" as="image" href="image/gugugaga-sing.png?v=20260803-13" />
-    <link rel="stylesheet" href="style.css?v=20260808-mining8" />
+    <link rel="stylesheet" href="style.css?v=20260810-savecode2" />
     <!-- TEST-ONLY DEBUG MODULE: omit this stylesheet and its matching markup/script in production. -->
     <link rel="stylesheet" href="test-only/debug/debug-tools.css?v=20260807-1" />
   </head>
@@ -39,9 +39,9 @@
         </div>
         <section class="save-setting" aria-label="存檔碼">
           <label for="save-code">存檔碼</label>
-          <textarea id="save-code" rows="2" spellcheck="false" autocapitalize="off" autocorrect="off" placeholder="在這裡貼上存檔碼"></textarea>
+          <input id="save-code" type="text" spellcheck="false" autocapitalize="off" autocorrect="off" placeholder="在這裡貼上存檔碼" />
           <div class="save-actions">
-            <button id="copy-save-code" type="button">複製存檔碼</button>
+            <button id="copy-save-code" type="button">生成存檔碼</button>
             <button id="import-save-code" type="button">匯入存檔碼</button>
           </div>
           <p id="save-code-status" class="save-code-status" aria-live="polite"></p>
@@ -218,6 +218,6 @@
     </main>
     <!-- TEST-ONLY DEBUG MODULE: defines the UI controller consumed by app.js. -->
     <script src="test-only/debug/debug-tools.js?v=20260807-1"></script>
-    <script src="app.js?v=20260808-mining8"></script>
+    <script src="app.js?v=20260810-savecode2"></script>
   </body>
 </html>
