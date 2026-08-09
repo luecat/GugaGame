@@ -37,6 +37,15 @@
             </svg>
           </div>
         </div>
+        <section class="save-setting" aria-label="存檔碼">
+          <label for="save-code">存檔碼</label>
+          <textarea id="save-code" rows="2" spellcheck="false" autocapitalize="off" autocorrect="off" placeholder="在這裡貼上存檔碼"></textarea>
+          <div class="save-actions">
+            <button id="copy-save-code" type="button">複製存檔碼</button>
+            <button id="import-save-code" type="button">匯入存檔碼</button>
+          </div>
+          <p id="save-code-status" class="save-code-status" aria-live="polite"></p>
+        </section>
         <!-- TEST-ONLY DEBUG MODULE START -->
         <section id="debug-tools" class="debug-panel" data-test-module="debug-tools" aria-label="調試專區">
           <span>調試專區</span>
