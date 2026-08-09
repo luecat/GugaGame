@@ -405,13 +405,18 @@ volumeSlider.addEventListener('input', () => {
 });
 setGameVolume(gameVolume, false);
 
-copySaveCodeButton.addEventListener('click', () => {
+copySaveCodeButton.addEventListener('click', async () => {
   saveGameState();
   const code = encodeSaveCode();
   saveCodeField.value = code;
   saveCodeField.focus();
   saveCodeField.select();
-  setSaveCodeStatus('存檔碼已生成，可自行複製備份。');
+  try {
+    await navigator.clipboard.writeText(code);
+    setSaveCodeStatus('存檔碼已生成並複製。');
+  } catch {
+    setSaveCodeStatus('存檔碼已生成，請自行複製備份。');
+  }
 });
 
 importSaveCodeButton.addEventListener('click', () => {
