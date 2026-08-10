@@ -12,7 +12,7 @@
     <meta property="og:type" content="website" />
     <title>Gugagame</title>
     <link rel="preload" as="image" href="image/gugugaga-sing.png?v=20260803-13" />
-    <link rel="stylesheet" href="style.css?v=20260808-mining8" />
+    <link rel="stylesheet" href="style.css?v=20260810-mainfix1" />
   </head>
   <body>
     <main class="world" aria-label="企鵝的草地">
@@ -35,6 +35,15 @@
             </svg>
           </div>
         </div>
+        <section class="save-setting" aria-label="存檔碼">
+          <label for="save-code">存檔</label>
+          <textarea id="save-code" rows="3" spellcheck="false" autocapitalize="off" autocorrect="off" placeholder="在這裡貼上存檔碼"></textarea>
+          <div class="save-actions">
+            <button id="copy-save-code" type="button">生成存檔碼</button>
+            <button id="import-save-code" type="button">匯入存檔碼</button>
+          </div>
+          <p id="save-code-status" class="save-code-status" aria-live="polite"></p>
+        </section>
       </section>
       <div class="sky" aria-hidden="true">
         <svg class="celestial sun" viewBox="0 0 100 100" role="presentation"><circle cx="50" cy="50" r="22" /><path d="M50 5v15M50 80v15M5 50h15M80 50h15M18 18l11 11M71 71l11 11M82 18 71 29M29 71 18 82" /></svg>
@@ -190,6 +199,6 @@
         </div>
       </section>
     </main>
-    <script src="app.js?v=20260808-mining8"></script>
+    <script src="app.js?v=20260810-mainfix1"></script>
   </body>
 </html>

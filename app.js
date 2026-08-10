@@ -11,6 +11,10 @@ const settingsButton = document.querySelector('#settings-button');
 const settingsMenu = document.querySelector('#settings-menu');
 const volumeSlider = document.querySelector('#volume-slider');
 const volumeControl = document.querySelector('.volume-control');
+const saveCodeField = document.querySelector('#save-code');
+const copySaveCodeButton = document.querySelector('#copy-save-code');
+const importSaveCodeButton = document.querySelector('#import-save-code');
+const saveCodeStatus = document.querySelector('#save-code-status');
 const featurePanel = document.querySelector('.feature-panel');
 const feedButton = document.querySelector('#feed-button');
 const feedButtonLabel = document.querySelector('#feed-button-label');
@@ -84,9 +88,11 @@ let clickCount = 0;
 let health = 100;
 let hunger = 6;
 let affection = 0;
+let lastStatusUpdatedAt = Math.floor(Date.now() / 60000);
 let lastAffectionCategory = '';
 let consecutiveAffectionActions = 0;
 let trustPromptUntil = 0;
+const OFFLINE_AFFECTION_INTERVAL_MINUTES = 48 * 60;
 let isDragging = false;
 let isFalling = false;
 let isDead = false;
@@ -179,12 +185,15 @@ const FOOD_STORAGE_VERSION_KEY = 'gugagame-food-inventory-version';
 const FOOD_STORAGE_VERSION = 'catch-rewards-v1';
 const FOOD_MAX_QUANTITY = 99;
 const FOOD_TYPES = ['apple', 'stone'];
-const GAME_STATE_STORAGE_KEY = 'gugagame-trust-state-v1';
+const SAVE_STORAGE_KEY = 'gugagame-save-state-v1';
 const AFFECTION_STORAGE_VERSION_KEY = 'gugagame-affection-version';
 const AFFECTION_STORAGE_VERSION = 'trust-growth-v1';
+const SAVE_CODE_PREFIX = 'GG1';
+const SAVE_CODE_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+const SAVE_CODE_CHECKSUM_MODULUS = 65_536;
 
 function readFoodInventory() {
-  const defaults = Object.fromEntries(FOOD_TYPES.map((type) => [type, 0]));
+  const defaults = { apple: 1, stone: 0 };
   try {
     if (window.localStorage.getItem(FOOD_STORAGE_VERSION_KEY) !== FOOD_STORAGE_VERSION) {
       window.localStorage.setItem(FOOD_STORAGE_VERSION_KEY, FOOD_STORAGE_VERSION);
@@ -204,33 +213,141 @@ function readFoodInventory() {
 
 let foodInventory = readFoodInventory();
 
-function saveGameState() {
-  try { window.localStorage.setItem(GAME_STATE_STORAGE_KEY, JSON.stringify({ health, hunger, affection, lastActiveAt: Date.now() })); } catch {}
-}
-
-function restoreGameState() {
-  try {
-    const state = JSON.parse(window.localStorage.getItem(GAME_STATE_STORAGE_KEY) || 'null');
-    const migrating = window.localStorage.getItem(AFFECTION_STORAGE_VERSION_KEY) !== AFFECTION_STORAGE_VERSION;
-    if (state) {
-      health = Math.max(1, Math.min(100, Math.round(state.health ?? health)));
-      hunger = Math.max(0, Math.min(10, Number(state.hunger ?? hunger)));
-      const elapsed = Math.max(0, Date.now() - Number(state.lastActiveAt || Date.now()));
-      affection = migrating ? 0 : Math.max(0, Math.min(100, Math.round(state.affection ?? 0) - Math.floor(elapsed / (48 * 60 * 60 * 1000))));
-    }
-    if (migrating && foodInventory.apple === 0) foodInventory.apple = 1;
-    window.localStorage.setItem(AFFECTION_STORAGE_VERSION_KEY, AFFECTION_STORAGE_VERSION);
-  } catch {}
-}
-
-restoreGameState();
-
-function saveFoodInventory() {
+function writeFoodInventory() {
   try {
     window.localStorage.setItem(FOOD_STORAGE_VERSION_KEY, FOOD_STORAGE_VERSION);
     window.localStorage.setItem(FOOD_STORAGE_KEY, JSON.stringify(foodInventory));
   } catch {}
 }
+
+function clampInteger(value, minimum, maximum) {
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.max(minimum, Math.min(maximum, Math.round(number))) : minimum;
+}
+
+function getSaveState() {
+  return {
+    apple: clampInteger(foodInventory.apple, 0, FOOD_MAX_QUANTITY),
+    stone: clampInteger(foodInventory.stone, 0, FOOD_MAX_QUANTITY),
+    health: clampInteger(health, 1, 100),
+    hunger2: clampInteger(hunger * 2, 0, 20),
+    affection: clampInteger(affection, 0, 100),
+    lastUpdatedAt: Math.max(0, Math.floor(lastStatusUpdatedAt)),
+  };
+}
+
+function saveGameState(touchTimestamp = true) {
+  if (touchTimestamp) lastStatusUpdatedAt = Math.floor(Date.now() / 60000);
+  try { window.localStorage.setItem(SAVE_STORAGE_KEY, JSON.stringify(getSaveState())); } catch {}
+}
+
+function saveFoodInventory() {
+  writeFoodInventory();
+  saveGameState();
+}
+
+function restoreGameState() {
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(SAVE_STORAGE_KEY) || 'null');
+    if (!stored || typeof stored !== 'object') return;
+    const needsAffectionMigration = window.localStorage.getItem(AFFECTION_STORAGE_VERSION_KEY) !== AFFECTION_STORAGE_VERSION;
+    foodInventory.apple = clampInteger(stored.apple, 0, FOOD_MAX_QUANTITY);
+    foodInventory.stone = clampInteger(stored.stone, 0, FOOD_MAX_QUANTITY);
+    health = clampInteger(stored.health, 1, 100);
+    hunger = clampInteger(stored.hunger2, 0, 20) / 2;
+    const now = Math.floor(Date.now() / 60000);
+    lastStatusUpdatedAt = clampInteger(stored.lastUpdatedAt, 0, now);
+    const elapsedMinutes = Math.max(0, now - lastStatusUpdatedAt);
+    const missedPeriods = Math.floor(elapsedMinutes / OFFLINE_AFFECTION_INTERVAL_MINUTES);
+    affection = needsAffectionMigration ? 0 : Math.max(0, clampInteger(stored.affection, 0, 100) - missedPeriods);
+    if (needsAffectionMigration && foodInventory.apple === 0) foodInventory.apple = 1;
+    lastStatusUpdatedAt = now;
+    window.localStorage.setItem(AFFECTION_STORAGE_VERSION_KEY, AFFECTION_STORAGE_VERSION);
+  } catch {}
+}
+
+function encodeBase58(value) {
+  if (value === 0n) return SAVE_CODE_ALPHABET[0];
+  let encoded = '';
+  while (value > 0n) {
+    const remainder = Number(value % 58n);
+    encoded = SAVE_CODE_ALPHABET[remainder] + encoded;
+    value /= 58n;
+  }
+  return encoded;
+}
+
+function decodeBase58(value) {
+  let decoded = 0n;
+  for (const character of value) {
+    const digit = SAVE_CODE_ALPHABET.indexOf(character);
+    if (digit < 0) throw new Error('存檔碼含有不支援的字元。');
+    decoded = decoded * 58n + BigInt(digit);
+  }
+  return decoded;
+}
+
+function saveChecksum(value) {
+  let checksum = 0x811c;
+  for (const character of value) {
+    checksum ^= character.charCodeAt(0);
+    checksum = Math.imul(checksum, 0x0101) >>> 0;
+  }
+  return checksum % SAVE_CODE_CHECKSUM_MODULUS;
+}
+
+function encodeSaveCode() {
+  const state = getSaveState();
+  let packed = BigInt(state.lastUpdatedAt);
+  packed = packed * 100n + BigInt(state.apple);
+  packed = packed * 100n + BigInt(state.stone);
+  packed = packed * 101n + BigInt(state.health);
+  packed = packed * 21n + BigInt(state.hunger2);
+  packed = packed * 101n + BigInt(state.affection);
+  const payload = encodeBase58(packed);
+  return `${SAVE_CODE_PREFIX}-${payload}-${encodeBase58(BigInt(saveChecksum(payload))).padStart(3, SAVE_CODE_ALPHABET[0])}`;
+}
+
+function decodeSaveCode(code) {
+  const normalized = code.trim().replace(/[\s-]+/g, '');
+  if (!normalized.startsWith(SAVE_CODE_PREFIX)) throw new Error('這不是 GG1 存檔碼。');
+  const raw = normalized.slice(SAVE_CODE_PREFIX.length);
+  if (raw.length < 4) throw new Error('存檔碼不完整。');
+  const payload = raw.slice(0, -3);
+  const checksum = raw.slice(-3);
+  if (Number(decodeBase58(checksum)) !== saveChecksum(payload)) throw new Error('存檔碼校驗失敗，請確認是否完整貼上。');
+  let packed = decodeBase58(payload);
+  const take = (base) => {
+    const value = Number(packed % BigInt(base));
+    packed /= BigInt(base);
+    return value;
+  };
+  const affection = take(101);
+  const hunger2 = take(21);
+  const health = take(101);
+  const stone = take(100);
+  const apple = take(100);
+  const lastUpdatedAt = Number(packed);
+  const now = Math.floor(Date.now() / 60000);
+  if (!Number.isSafeInteger(lastUpdatedAt) || lastUpdatedAt < 0 || lastUpdatedAt > now + 10) throw new Error('存檔時間無效。');
+  return { apple, stone, health: Math.max(1, health), hunger2, affection, lastUpdatedAt };
+}
+
+function setSaveCodeStatus(message, isError = false) {
+  saveCodeStatus.textContent = message;
+  saveCodeStatus.classList.toggle('is-error', isError);
+}
+
+function renderSavedState() {
+  renderHealth();
+  renderHunger();
+  renderAffection();
+  updateFoodPicker();
+}
+
+restoreGameState();
+writeFoodInventory();
+saveGameState();
 
 function updateFoodPicker() {
   let totalQuantity = 0;
@@ -307,6 +424,39 @@ volumeSlider.addEventListener('input', () => {
 });
 setGameVolume(gameVolume, false);
 
+copySaveCodeButton.addEventListener('click', async () => {
+  saveGameState();
+  const code = encodeSaveCode();
+  saveCodeField.value = code;
+  saveCodeField.focus();
+  saveCodeField.select();
+  try {
+    await navigator.clipboard.writeText(code);
+    setSaveCodeStatus('存檔碼已生成並複製。');
+  } catch {
+    setSaveCodeStatus('存檔碼已生成，請自行複製備份。');
+  }
+});
+
+importSaveCodeButton.addEventListener('click', () => {
+  try {
+    const state = decodeSaveCode(saveCodeField.value);
+    if (!window.confirm('匯入會覆蓋目前的背包、血量、飽食度與好感度，確定要繼續嗎？')) return;
+    foodInventory.apple = state.apple;
+    foodInventory.stone = state.stone;
+    health = state.health;
+    hunger = state.hunger2 / 2;
+    affection = state.affection;
+    lastStatusUpdatedAt = state.lastUpdatedAt;
+    writeFoodInventory();
+    saveGameState(false);
+    renderSavedState();
+    setSaveCodeStatus('已匯入存檔碼。');
+  } catch (error) {
+    setSaveCodeStatus(error.message || '無法讀取存檔碼。', true);
+  }
+});
+
 const MAX_HEALTH = 100;
 const MAX_HUNGER = 10;
 const MAX_AFFECTION = 100;
@@ -352,6 +502,7 @@ const MINING_PICKS = [
 ];
 const USE_IOS_TOUCH_DRAG = /iPad|iPhone|iPod/.test(navigator.userAgent)
   || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
 function getMinuteCloudCount(date = new Date()) {
   return date.getMinutes() % 10;
 }
@@ -1154,7 +1305,7 @@ function setCatchMode(enabled) {
   isAdventureMenuOpen = false;
   document.body.classList.remove('adventure-menu-open');
   adventureMenu.inert = true;
-  setFeedingMode(false); setInteractionMode(false); setSingingMode(false); setRpsMode(false); setBallMode(false); setHideAndSeekMode(false);
+  setFeedingMode(false); setInteractionMode(false); setSingingMode(false); setRpsMode(false); setBallMode(false);
   walking = false;
   pet.classList.remove('walking');
   catchApplesCount = 0; catchStonesCount = 0; renderCatchScore();
@@ -1175,7 +1326,7 @@ function setAdventureMenu(enabled) {
   adventureMenu.setAttribute('aria-hidden', String(!enabled));
   if (enabled) {
     stopGenshinOutsideMain();
-    setFeedingMode(false); setInteractionMode(false); setSingingMode(false); setRpsMode(false); setBallMode(false); setHideAndSeekMode(false);
+    setFeedingMode(false); setInteractionMode(false); setSingingMode(false); setRpsMode(false); setBallMode(false);
     walking = false;
     pet.classList.remove('walking');
   }
@@ -1301,13 +1452,15 @@ function mineRock(rock) {
   if (!isMiningMode || !miningPick) return;
   if (miningIsTired()) { showMiningTiredAndExit(); return; }
   rock.classList.add('is-breaking');
+  miningRunHadAttempt = true;
   const gotStone = Math.random() < miningPick.chance;
   window.setTimeout(() => {
     if (!isMiningMode) return;
     rock.classList.remove('is-breaking');
     if (gotStone) {
+      miningRunFoundStone = true;
       foodInventory.stone = Math.min(FOOD_MAX_QUANTITY, foodInventory.stone + 1); saveFoodInventory(); updateFoodPicker();
-      hunger = Math.max(0, hunger - MINING_HUNGER_COST); renderHunger();
+      hunger = Math.max(0, hunger - MINING_HUNGER_COST); renderHunger(); saveGameState();
       showMiningResult('挖到石頭了！', 'is-success');
       if (miningIsTired()) showMiningTiredAndExit(950);
     } else showMiningResult('鎬子太爛\n挖到滾木了', 'is-fail');
@@ -1341,6 +1494,7 @@ document.addEventListener('keydown', (event) => {
   const current = catchPenguin.getBoundingClientRect().left + catchPenguin.offsetWidth / 2;
   moveCatchPenguin(current + (event.key === 'ArrowLeft' ? -48 : 48));
 });
+
 const HIDE_GAME_SPOTS = [
   [15, 28, 82, 'boulder'], [37, 21, 94, 'bush'], [65, 28, 90, 'boulder'],
   [84, 20, 80, 'boulder'], [23, 58, 94, 'bush'], [49, 53, 108, 'hut'],
@@ -1404,9 +1558,6 @@ function setHideAndSeekMode(enabled) {
   setFeedingMode(false);
   setSingingMode(false);
   setRpsMode(false);
-  setBallMode(false);
-  setCatchMode(false);
-  setAdventureMenu(false);
   walking = false;
   pet.classList.remove('walking');
   unlockGameSounds();
@@ -1636,9 +1787,8 @@ function collectFood() {
   updateFoodPicker();
   foodCollectedDuringJump = feedingJumpActive;
   hunger = Math.min(MAX_HUNGER, hunger + (isStone ? STONE_HUNGER_GAIN : FEED_HUNGER_GAIN));
-  affection = Math.min(MAX_AFFECTION, affection + (isStone ? STONE_AFFECTION_GAIN : FEED_AFFECTION_GAIN));
+  applyAffectionGain(isStone ? STONE_AFFECTION_GAIN : FEED_AFFECTION_GAIN, 'feeding');
   renderHunger();
-  renderAffection();
   removeActiveFood();
   resetMoralSoundSequence(true);
   pet.classList.remove('feeding-chasing', 'feeding-running-away', 'walking');
@@ -2115,6 +2265,9 @@ function restartGame() {
   clickCount = 0;
   health = MAX_HEALTH;
   hunger = 6;
+  affection = 0;
+  foodInventory.apple = 1;
+  foodInventory.stone = 0;
   position = 42;
   stopSound(screamSound);
   stopSound(deathSound);
@@ -2131,6 +2284,9 @@ function restartGame() {
   renderHealth();
   renderHunger();
   renderAffection();
+  updateFoodPicker();
+  writeFoodInventory();
+  saveGameState();
 }
 
 function showHurtEffect(damage, cause, visualTarget = pet) {
@@ -2138,7 +2294,7 @@ function showHurtEffect(damage, cause, visualTarget = pet) {
   health = Math.max(0, health - damage);
   applyAffectionLoss(Math.ceil(damage / 10) * AFFECTION_LOSS_PER_10_DAMAGE);
   renderHealth();
-  renderAffection();
+  saveGameState();
   if (health === 0) {
     triggerDeath(cause);
     return;
@@ -2191,6 +2347,7 @@ function healFromFullHunger() {
   hunger = Math.max(0, hunger - HEAL_HUNGER_COST);
   renderHealth();
   renderHunger();
+  saveGameState();
 }
 
 pet.addEventListener('pointerdown', (event) => {
