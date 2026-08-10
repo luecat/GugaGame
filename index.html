@@ -12,9 +12,7 @@
     <meta property="og:type" content="website" />
     <title>Gugagame</title>
     <link rel="preload" as="image" href="image/gugugaga-sing.png?v=20260803-13" />
-    <link rel="stylesheet" href="style.css?v=20260810-savecode3" />
-    <!-- TEST-ONLY DEBUG MODULE: omit this stylesheet and its matching markup/script in production. -->
-    <link rel="stylesheet" href="test-only/debug/debug-tools.css?v=20260807-1" />
+    <link rel="stylesheet" href="style.css?v=20260810-mainfix2" />
   </head>
   <body>
     <main class="world" aria-label="企鵝的草地">
@@ -46,25 +44,6 @@
           </div>
           <p id="save-code-status" class="save-code-status" aria-live="polite"></p>
         </section>
-        <!-- TEST-ONLY DEBUG MODULE START -->
-        <section id="debug-tools" class="debug-panel" data-test-module="debug-tools" aria-label="調試專區">
-          <span>調試專區</span>
-          <button id="debug-day-night" type="button">切換晝夜預覽</button>
-          <button id="debug-hurt" type="button">扣血測試</button>
-          <button id="debug-full-hunger" type="button">飽食滿格</button>
-          <button id="debug-cloud-count" type="button">改雲數量</button>
-          <button id="debug-death" type="button">死亡測試</button>
-          <label class="debug-food-control" for="debug-food-type">食物數量
-            <select id="debug-food-type">
-              <option value="apple">蘋果</option>
-              <option value="stone">石頭</option>
-            </select>
-            <input id="debug-food-amount" type="text" inputmode="numeric" value="+99" aria-label="食物數量變更，例如加 99 或減 23" />
-          </label>
-          <button id="debug-food-apply" type="button">套用數量變更</button>
-          <button id="debug-food-clear" type="button">清空數量</button>
-        </section>
-        <!-- TEST-ONLY DEBUG MODULE END -->
       </section>
       <div class="sky" aria-hidden="true">
         <svg class="celestial sun" viewBox="0 0 100 100" role="presentation"><circle cx="50" cy="50" r="22" /><path d="M50 5v15M50 80v15M5 50h15M80 50h15M18 18l11 11M71 71l11 11M82 18 71 29M29 71 18 82" /></svg>
@@ -79,20 +58,23 @@
           <span class="hud-label">血量</span>
           <div class="stat-meter health" aria-label="血量：滿">
             <div class="stat-track" aria-hidden="true"><div class="stat-fill health-fill"></div></div>
+            <strong id="health-value" class="hud-value">100</strong>
           </div>
         </div>
         <div class="hud-row">
           <span class="hud-label">飽食度</span>
           <div class="stat-meter hunger" aria-label="飽食度：60%">
             <div class="stat-track" aria-hidden="true"><div class="stat-fill hunger-fill"></div></div>
+            <strong id="hunger-value" class="hud-value">6</strong>
           </div>
         </div>
         <div class="hud-row">
           <span class="hud-label">好感度</span>
-          <div class="affection" aria-label="好感度：40%">
+          <div class="affection" aria-label="好感度：0%">
             <div class="affection-track" aria-hidden="true">
               <div class="affection-fill"></div>
             </div>
+            <strong id="affection-value" class="hud-value">0</strong>
           </div>
         </div>
       </aside>
@@ -100,6 +82,7 @@
       <button id="pet" class="pet" aria-label="點擊企鵝讓牠跳躍">
         <img src="image/gugugaga-white.png" alt="企鵝" draggable="false" />
       </button>
+      <div id="affection-popups" class="affection-popups" aria-live="polite" aria-atomic="false"></div>
       <section class="feature-panel" aria-label="功能專區">
         <div class="feature-actions">
           <button id="feed-button" type="button" aria-label="餵食企鵝">
@@ -216,8 +199,6 @@
         </div>
       </section>
     </main>
-    <!-- TEST-ONLY DEBUG MODULE: defines the UI controller consumed by app.js. -->
-    <script src="test-only/debug/debug-tools.js?v=20260807-1"></script>
-    <script src="app.js?v=20260810-savecode3"></script>
+    <script src="app.js?v=20260810-mainfix2"></script>
   </body>
 </html>
