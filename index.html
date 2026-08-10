@@ -49,20 +49,23 @@
           <span class="hud-label">血量</span>
           <div class="stat-meter health" aria-label="血量：滿">
             <div class="stat-track" aria-hidden="true"><div class="stat-fill health-fill"></div></div>
+            <strong id="health-value" class="hud-value">100</strong>
           </div>
         </div>
         <div class="hud-row">
           <span class="hud-label">飽食度</span>
           <div class="stat-meter hunger" aria-label="飽食度：60%">
             <div class="stat-track" aria-hidden="true"><div class="stat-fill hunger-fill"></div></div>
+            <strong id="hunger-value" class="hud-value">6</strong>
           </div>
         </div>
         <div class="hud-row">
           <span class="hud-label">好感度</span>
-          <div class="affection" aria-label="好感度：40%">
+          <div class="affection" aria-label="好感度：0%">
             <div class="affection-track" aria-hidden="true">
               <div class="affection-fill"></div>
             </div>
+            <strong id="affection-value" class="hud-value">0</strong>
           </div>
         </div>
       </aside>
@@ -70,6 +73,7 @@
       <button id="pet" class="pet" aria-label="點擊企鵝讓牠跳躍">
         <img src="image/gugugaga-white.png" alt="企鵝" draggable="false" />
       </button>
+      <div id="affection-popups" class="affection-popups" aria-live="polite" aria-atomic="false"></div>
       <section class="feature-panel" aria-label="功能專區">
         <div class="feature-actions">
           <button id="feed-button" type="button" aria-label="餵食企鵝">
