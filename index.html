@@ -222,7 +222,13 @@
         </div>
       </section>
     </main>
+    <script>
+      (() => {
+        const hour = new Date().getHours();
+        document.body.classList.toggle("is-night", hour < 6 || hour >= 18);
+      })();
+    </script>
     <script src="test-only/debug/debug-tools-20260812-affection1.js"></script>
-    <script src="app-20260811-beta-debug1.js"></script>
+    <script src="app-20260812-beta-sync1.js"></script>
   </body>
 </html>
