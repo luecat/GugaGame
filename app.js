@@ -194,7 +194,7 @@ const SAVE_CODE_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrst
 const SAVE_CODE_CHECKSUM_MODULUS = 65_536;
 
 function readFoodInventory() {
-  const defaults = { apple: 1, stone: 0 };
+  const defaults = { apple: 10, stone: 0 };
   try {
     if (window.localStorage.getItem(FOOD_STORAGE_VERSION_KEY) !== FOOD_STORAGE_VERSION) {
       window.localStorage.setItem(FOOD_STORAGE_VERSION_KEY, FOOD_STORAGE_VERSION);
@@ -2269,7 +2269,7 @@ function restartGame() {
   health = MAX_HEALTH;
   hunger = 6;
   affection = 0;
-  foodInventory.apple = 1;
+  foodInventory.apple = 10;
   foodInventory.stone = 0;
   position = 42;
   stopSound(screamSound);
