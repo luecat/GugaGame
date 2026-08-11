@@ -14,6 +14,7 @@ const volumeControl = document.querySelector('.volume-control');
 const saveCodeField = document.querySelector('#save-code');
 const copySaveCodeButton = document.querySelector('#copy-save-code');
 const importSaveCodeButton = document.querySelector('#import-save-code');
+const resetGameButton = document.querySelector('#reset-game');
 const saveCodeStatus = document.querySelector('#save-code-status');
 const featurePanel = document.querySelector('.feature-panel');
 const feedButton = document.querySelector('#feed-button');
@@ -2527,6 +2528,12 @@ foodPicker.querySelectorAll('[data-food-type]').forEach((button) => {
 updateFoodPicker();
 
 restartButton.addEventListener('click', restartGame);
+resetGameButton.addEventListener('click', () => {
+  if (!window.confirm('確定要重新開始嗎？目前的遊戲進度會被清除。')) return;
+  restartGame();
+  saveCodeField.value = '';
+  setSaveCodeStatus('已重新開始。');
+});
 
 renderHealth();
 renderHunger();
