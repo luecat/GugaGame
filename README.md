@@ -26,6 +26,6 @@
 
 直接使用瀏覽器開啟 `index.html` 即可遊玩。
 
-## GitHub Pages
+## Cloudflare Pages
 
-https://luecat.github.io/GugaGame/
+https://luecat.com/
