@@ -46,7 +46,7 @@ body.feeding-mode .pet { pointer-events: none; }
 .affection-track { flex: 1; min-width: 0; height: 8px; border-radius: 99px; background: #d9d4cd; overflow: hidden; }
 .affection-fill { width: 40%; height: 100%; border-radius: inherit; background: #f2bd4a; transition: width .22s ease; }
 .affection-popups { position: fixed; z-index: 95; inset: 0; pointer-events: none; overflow: hidden; }
-.affection-popup { position: absolute; margin: 0; color: #a16616; font-size: clamp(14px, 2.4vw, 19px); font-weight: 900; line-height: 1; opacity: 0; text-shadow: 0 2px 0 #fff, 0 0 6px #fff; transform: translate(-50%, 8px) scale(.82); transition: opacity .16s ease-out, transform 1.9s ease-out; }
+.affection-popup { position: absolute; margin: 0; color: #a16616; font-size: clamp(14px, 2.4vw, 19px); font-weight: 900; line-height: 1; opacity: 0; -webkit-text-stroke: 1px #5e4016; paint-order: stroke fill; text-shadow: none; transform: translate(-50%, 8px) scale(.82); transition: opacity .16s ease-out, transform 1.9s ease-out; }
 .affection-popup.is-visible { opacity: 1; transform: translate(-50%, -52px) scale(1); }
 .affection-popup.is-fading { opacity: 0; }
 .affection-popup.is-loss { color: #b44242; }
