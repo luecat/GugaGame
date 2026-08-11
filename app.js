@@ -644,7 +644,9 @@ function showAffectionPopup(amount, isLoss = false) {
   popup.style.left = `${petRect.left + petRect.width / 2}px`;
   popup.style.top = `${Math.max(18, petRect.top)}px`;
   affectionPopups.append(popup);
-  popup.addEventListener('animationend', () => popup.remove(), { once: true });
+  requestAnimationFrame(() => popup.classList.add('is-visible'));
+  window.setTimeout(() => popup.classList.add('is-fading'), 1750);
+  window.setTimeout(() => popup.remove(), 2150);
 }
 
 function applyAffectionGain(baseAmount, category) {
