@@ -9,6 +9,7 @@
     dayNightButton: '#debug-day-night',
     hurtButton: '#debug-hurt',
     fullHungerButton: '#debug-full-hunger',
+    addAffectionButton: '#debug-add-affection',
     cloudCountButton: '#debug-cloud-count',
     deathButton: '#debug-death',
     foodType: '#debug-food-type',
@@ -44,6 +45,7 @@
     });
     controls.hurtButton.addEventListener('click', api.hurt);
     controls.fullHungerButton.addEventListener('click', api.fillHunger);
+    controls.addAffectionButton.addEventListener('click', api.addAffection);
     controls.cloudCountButton.addEventListener('click', () => {
       const count = api.cycleCloudCount();
       controls.cloudCountButton.textContent = `改雲數量：${count}`;

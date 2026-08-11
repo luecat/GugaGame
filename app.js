@@ -75,16 +75,24 @@ const hungerMeter = document.querySelector('.hunger');
 const hungerFill = document.querySelector('.hunger-fill');
 const healthMeter = document.querySelector('.health');
 const healthFill = document.querySelector('.health-fill');
+const healthValue = document.querySelector('#health-value');
 const affectionMeter = document.querySelector('.affection');
 const affectionFill = document.querySelector('.affection-fill');
+const affectionValue = document.querySelector('#affection-value');
+const hungerValue = document.querySelector('#hunger-value');
+const affectionPopups = document.querySelector('#affection-popups');
 let position = 42;
 let walking = false;
 let clickTimer;
 let clickCount = 0;
 let health = 100;
 let hunger = 6;
-let affection = 40;
+let affection = 0;
 let lastStatusUpdatedAt = Math.floor(Date.now() / 60000);
+let lastAffectionCategory = '';
+let consecutiveAffectionActions = 0;
+let trustPromptUntil = 0;
+const OFFLINE_AFFECTION_INTERVAL_MINUTES = 48 * 60;
 let isDragging = false;
 let isFalling = false;
 let isDead = false;
@@ -110,6 +118,8 @@ const catchGameState = { lastTime: 0, penguinX: .5 };
 let catchControlPointerId = null;
 let isMiningMode = false;
 let miningPick = null;
+let miningRunHadAttempt = false;
+let miningRunFoundStone = false;
 let miningPickTimer;
 let miningRollInterval;
 let miningResultTimer;
@@ -176,12 +186,14 @@ const FOOD_STORAGE_VERSION = 'catch-rewards-v1';
 const FOOD_MAX_QUANTITY = 99;
 const FOOD_TYPES = ['apple', 'stone'];
 const SAVE_STORAGE_KEY = 'gugagame-save-state-v1';
+const AFFECTION_STORAGE_VERSION_KEY = 'gugagame-affection-version';
+const AFFECTION_STORAGE_VERSION = 'trust-growth-v1';
 const SAVE_CODE_PREFIX = 'GG1';
 const SAVE_CODE_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 const SAVE_CODE_CHECKSUM_MODULUS = 65_536;
 
 function readFoodInventory() {
-  const defaults = Object.fromEntries(FOOD_TYPES.map((type) => [type, 0]));
+  const defaults = { apple: 1, stone: 0 };
   try {
     if (window.localStorage.getItem(FOOD_STORAGE_VERSION_KEY) !== FOOD_STORAGE_VERSION) {
       window.localStorage.setItem(FOOD_STORAGE_VERSION_KEY, FOOD_STORAGE_VERSION);
@@ -238,13 +250,19 @@ function restoreGameState() {
   try {
     const stored = JSON.parse(window.localStorage.getItem(SAVE_STORAGE_KEY) || 'null');
     if (!stored || typeof stored !== 'object') return;
+    const needsAffectionMigration = window.localStorage.getItem(AFFECTION_STORAGE_VERSION_KEY) !== AFFECTION_STORAGE_VERSION;
     foodInventory.apple = clampInteger(stored.apple, 0, FOOD_MAX_QUANTITY);
     foodInventory.stone = clampInteger(stored.stone, 0, FOOD_MAX_QUANTITY);
     health = clampInteger(stored.health, 1, 100);
     hunger = clampInteger(stored.hunger2, 0, 20) / 2;
-    affection = clampInteger(stored.affection, 0, 100);
     const now = Math.floor(Date.now() / 60000);
     lastStatusUpdatedAt = clampInteger(stored.lastUpdatedAt, 0, now);
+    const elapsedMinutes = Math.max(0, now - lastStatusUpdatedAt);
+    const missedPeriods = Math.floor(elapsedMinutes / OFFLINE_AFFECTION_INTERVAL_MINUTES);
+    affection = needsAffectionMigration ? 0 : Math.max(0, clampInteger(stored.affection, 0, 100) - missedPeriods);
+    if (needsAffectionMigration && foodInventory.apple === 0) foodInventory.apple = 1;
+    lastStatusUpdatedAt = now;
+    window.localStorage.setItem(AFFECTION_STORAGE_VERSION_KEY, AFFECTION_STORAGE_VERSION);
   } catch {}
 }
 
@@ -329,6 +347,7 @@ function renderSavedState() {
 
 restoreGameState();
 writeFoodInventory();
+saveGameState();
 
 function updateFoodPicker() {
   let totalQuantity = 0;
@@ -451,10 +470,10 @@ const FULL_HUNGER_HEAL_INTERVAL = 3000;
 const HEAL_AMOUNT = 10;
 const HEAL_HUNGER_COST = 1;
 const FEED_HUNGER_GAIN = .5;
-const FEED_AFFECTION_GAIN = 3;
+const FEED_AFFECTION_GAIN = 2;
 const STONE_HUNGER_GAIN = 1;
-const STONE_AFFECTION_GAIN = 10;
-const AFFECTION_LOSS_PER_DAMAGE = 1;
+const STONE_AFFECTION_GAIN = 5;
+const AFFECTION_LOSS_PER_10_DAMAGE = 10;
 const DEATH_RED_FLASH_DELAY = 180;
 const DEATH_SCREEN_DELAY = 500;
 const CLOUD_TRAVEL_MS = 60_000;
@@ -601,18 +620,67 @@ function updateDayNightFromBrowserTime() {
 function renderHunger() {
   const percentage = (hunger / MAX_HUNGER) * 100;
   hungerFill.style.width = `${percentage}%`;
+  hungerValue.textContent = Number.isInteger(hunger) ? String(hunger) : hunger.toFixed(1);
   hungerMeter.setAttribute('aria-label', `飽食度：${percentage}%`);
 }
 
 function renderHealth() {
   const percentage = (health / MAX_HEALTH) * 100;
   healthFill.style.width = `${percentage}%`;
+  healthValue.textContent = String(health);
   healthMeter.setAttribute('aria-label', `血量：${percentage}%`);
 }
 
 function renderAffection() {
   affectionFill.style.width = `${affection}%`;
+  affectionValue.textContent = String(affection);
   affectionMeter.setAttribute('aria-label', `好感度：${affection}%`);
+}
+
+function showAffectionPopup(amount, isLoss = false) {
+  const petRect = pet.getBoundingClientRect();
+  const popup = document.createElement('p');
+  popup.className = `affection-popup${isLoss ? ' is-loss' : ''}`;
+  popup.textContent = typeof amount === 'string' ? amount : `好感 ${isLoss ? '-' : '+'}${amount}`;
+  popup.style.left = `${petRect.left + petRect.width / 2}px`;
+  popup.style.top = `${Math.max(18, petRect.top)}px`;
+  affectionPopups.append(popup);
+  popup.addEventListener('animationend', () => popup.remove(), { once: true });
+}
+
+function applyAffectionGain(baseAmount, category) {
+  if (affection >= MAX_AFFECTION || baseAmount <= 0) return 0;
+  if (category === lastAffectionCategory) consecutiveAffectionActions += 1;
+  else {
+    lastAffectionCategory = category;
+    consecutiveAffectionActions = 1;
+  }
+  const amount = consecutiveAffectionActions > 3 ? Math.max(1, Math.round(baseAmount * .2)) : baseAmount;
+  const gained = Math.min(amount, MAX_AFFECTION - affection);
+  affection += gained;
+  renderAffection();
+  saveGameState();
+  showAffectionPopup(gained);
+  return gained;
+}
+
+function applyAffectionLoss(amount, showPopup = true) {
+  const lost = Math.min(Math.max(0, amount), affection);
+  if (!lost) return 0;
+  affection -= lost;
+  renderAffection();
+  saveGameState();
+  if (showPopup) showAffectionPopup(lost, true);
+  return lost;
+}
+
+function affectionRequired(minimum = 1) {
+  if (affection >= minimum) return false;
+  if (Date.now() >= trustPromptUntil) {
+    trustPromptUntil = Date.now() + 900;
+    showAffectionPopup(affection === 0 ? '好感度不足，先去餵食吧！' : `需要好感度 ${minimum}`);
+  }
+  return true;
 }
 
 function resetMoralSoundSequence(stopPlayback = false) {
@@ -751,6 +819,7 @@ function setFeedingMode(enabled) {
 }
 
 function setInteractionMode(enabled) {
+  if (enabled && affectionRequired()) return;
   if (enabled && (isSettingsOpen() || isDead || isFeedingMode || isRpsMode || isRpsResolving || isBallMode || isHideAndSeekMode)) return;
   if (enabled) setSingingMode(false);
   isInteractionMode = enabled;
@@ -764,6 +833,7 @@ function setInteractionMode(enabled) {
 }
 
 function setRpsMode(enabled) {
+  if (enabled && affectionRequired(10)) return;
   if (enabled && (isSettingsOpen() || isDead || isFeedingMode || isSingingMode || isRpsResolving || isBallMode || isHideAndSeekMode)) return;
   isRpsMode = enabled;
   document.body.classList.toggle('rps-mode', enabled);
@@ -822,9 +892,10 @@ async function playRpsRound(userHand) {
   if (!isRpsMode || isRpsResolving || isDead) return;
   window.clearTimeout(rpsResultResetTimer);
   rpsResultResetTimer = undefined;
-  const shouldUserWin = penguinWinStreak >= 3 || Math.floor(Math.random() * 10) % 2 === 0;
-  const penguinHand = shouldUserWin ? RPS_LOSING_HAND[userHand] : RPS_WINNING_HAND[userHand];
-  const resultText = shouldUserWin ? '你贏了！' : '企鵝贏了！';
+  const isDraw = Math.random() < .2;
+  const shouldUserWin = !isDraw && (penguinWinStreak >= 3 || Math.floor(Math.random() * 10) % 2 === 0);
+  const penguinHand = isDraw ? userHand : (shouldUserWin ? RPS_LOSING_HAND[userHand] : RPS_WINNING_HAND[userHand]);
+  const resultText = isDraw ? '平手！' : (shouldUserWin ? '你贏了！' : '企鵝贏了！');
 
   setRpsPlaybackLock(true);
   pet.classList.remove('rps-user-win', 'rps-penguin-win');
@@ -839,16 +910,22 @@ async function playRpsRound(userHand) {
   }, 2000);
   void pet.offsetWidth;
 
-  const animationClass = shouldUserWin ? 'rps-user-win' : 'rps-penguin-win';
-  const animationName = shouldUserWin ? 'rps-disappointed-shake' : 'rps-victory-shake';
-  pet.classList.add(animationClass);
-  await Promise.all([
-    waitForAnimation(pet, animationName),
-    playSoundAndWait(shouldUserWin ? screamSound : penguinWinSound),
-  ]);
-  pet.classList.remove(animationClass);
-  if (shouldUserWin) penguinWinStreak = 0;
+  if (isDraw) {
+    await new Promise((resolve) => window.setTimeout(resolve, 600));
+  } else {
+    const animationClass = shouldUserWin ? 'rps-user-win' : 'rps-penguin-win';
+    const animationName = shouldUserWin ? 'rps-disappointed-shake' : 'rps-victory-shake';
+    pet.classList.add(animationClass);
+    await Promise.all([
+      waitForAnimation(pet, animationName),
+      playSoundAndWait(shouldUserWin ? screamSound : penguinWinSound),
+    ]);
+    pet.classList.remove(animationClass);
+  }
+  if (isDraw) penguinWinStreak = 0;
+  else if (shouldUserWin) penguinWinStreak = 0;
   else penguinWinStreak += 1;
+  if (!isDraw) applyAffectionGain(shouldUserWin ? 1 : 3, 'rps');
   setRpsPlaybackLock(false);
 }
 
@@ -913,6 +990,7 @@ function startSingingWaveAnimation(getCurrentTime) {
 }
 
 function setSingingMode(enabled) {
+  if (enabled && affectionRequired(30)) return;
   isSingingMode = enabled;
   document.body.classList.toggle('singing-mode', enabled);
   singingPicker.inert = !enabled;
@@ -930,12 +1008,15 @@ function playSingingSong() {
   if (!isSingingMode || isDead) return;
   unlockGameSounds();
   stopSound(singingSound);
-  playSound(singingSound);
+  playSound(singingSound, () => {
+    if (isSingingMode && !isDead) applyAffectionGain(3, 'singing');
+  });
 }
 
 // A compact canvas game keeps the court responsive without adding another character system.
 const ballPlay = {
-  width: 0, height: 0, playerX: .5, penguinX: .5,
+  width: 0, height: 0, playerX: .5, penguinX: .5, penguinY: .5,
+  penguinTargetX: .5, penguinTargetY: .5, penguinSpeed: 4, nextTacticAt: 0,
   ballX: .5, ballY: .64, velocityX: .22, velocityY: -.42,
   pausedUntil: 0, swingUntil: 0, frame: undefined, lastTime: 0,
 };
@@ -963,6 +1044,22 @@ function resetBallServe(direction = Math.random() < .5 ? -1 : 1) {
   ballGameStatus.textContent = '接住球！';
 }
 
+function choosePenguinTactic(now) {
+  const { width: w, height: h } = ballPlay;
+  const minX = ballCourtEdge(h * .18) + 18;
+  const maxX = w - minX;
+  const minY = h * .12;
+  const maxY = h * .40;
+  const isIncoming = ballPlay.velocityY < 0 && ballPlay.ballY < h * .5;
+  const chasesBall = isIncoming && Math.random() < .76;
+  const targetX = chasesBall ? ballPlay.ballX + (Math.random() - .5) * w * .09 : minX + Math.random() * (maxX - minX);
+  const targetY = chasesBall ? ballPlay.ballY + (Math.random() - .5) * h * .08 : minY + Math.random() * (maxY - minY);
+  ballPlay.penguinTargetX = Math.max(minX, Math.min(maxX, targetX));
+  ballPlay.penguinTargetY = Math.max(minY, Math.min(maxY, targetY));
+  ballPlay.penguinSpeed = 2.8 + Math.random() * 3.4;
+  ballPlay.nextTacticAt = now + 260 + Math.random() * 540;
+}
+
 function drawBallCourt() {
   const ctx = ballCourt.getContext('2d');
   const { width: w, height: h } = ballPlay;
@@ -983,8 +1080,8 @@ function drawBallCourt() {
   for (let x = netInset; x < w - netInset; x += Math.max(12, w * .035)) { ctx.beginPath(); ctx.moveTo(x, netY); ctx.lineTo(x, netY + h * .07); ctx.stroke(); }
   for (let y = netY + h * .018; y < netY + h * .07; y += Math.max(8, h * .018)) { ctx.beginPath(); ctx.moveTo(netInset, y); ctx.lineTo(w - netInset, y); ctx.stroke(); }
 
-  const penguinY = h * .18, penguinSize = Math.min(w, h) * .095;
-  ctx.save(); ctx.translate(ballPlay.penguinX, penguinY);
+  const penguinSize = Math.min(w, h) * .095;
+  ctx.save(); ctx.translate(ballPlay.penguinX, ballPlay.penguinY);
   // Reuse the scene's real penguin artwork so the mini-game stays in the same style.
   const penguinArtSize = penguinSize * 2.25;
   ctx.drawImage(petImage, -penguinArtSize / 2, -penguinArtSize * .62, penguinArtSize, penguinArtSize);
@@ -1013,8 +1110,18 @@ function ballGameFrame(now) {
   ballPlay.lastTime = now;
   const { width: w, height: h } = ballPlay;
   if (now >= ballPlay.pausedUntil) {
-    const penguinTarget = Math.max(ballCourtEdge(h * .18) + 18, Math.min(w - ballCourtEdge(h * .18) - 18, ballPlay.ballX));
-    ballPlay.penguinX += (penguinTarget - ballPlay.penguinX) * Math.min(1, dt * 4.5);
+    const ballIsApproachingPenguin = ballPlay.velocityY < 0 && ballPlay.ballY < h * .43;
+    if (ballIsApproachingPenguin) {
+      const minX = ballCourtEdge(h * .18) + 18;
+      const minY = h * .12;
+      const maxY = h * .40;
+      ballPlay.penguinTargetX = Math.max(minX, Math.min(w - minX, ballPlay.ballX));
+      ballPlay.penguinTargetY = Math.max(minY, Math.min(maxY, ballPlay.ballY));
+      ballPlay.penguinSpeed = 8.5;
+    } else if (now >= ballPlay.nextTacticAt) choosePenguinTactic(now);
+    const movement = Math.min(1, dt * ballPlay.penguinSpeed);
+    ballPlay.penguinX += (ballPlay.penguinTargetX - ballPlay.penguinX) * movement;
+    ballPlay.penguinY += (ballPlay.penguinTargetY - ballPlay.penguinY) * movement;
     ballPlay.ballX += ballPlay.velocityX * w * dt;
     ballPlay.ballY += ballPlay.velocityY * h * dt;
     const edge = ballCourtEdge(ballPlay.ballY), radius = Math.max(11, w * .022);
@@ -1031,15 +1138,19 @@ function ballGameFrame(now) {
       ballCombo += 1;
       ballComboValue.textContent = String(ballCombo);
     }
-    const penguinY = h * .18, penguinReach = Math.min(w * .14, h * .18);
-    if (ballPlay.velocityY < 0 && ballPlay.ballY <= penguinY + penguinReach && ballPlay.ballY >= penguinY - penguinReach && Math.abs(ballPlay.ballX - ballPlay.penguinX) < penguinReach) {
-      ballPlay.ballY = penguinY + penguinReach;
-      ballPlay.velocityY = Math.abs(ballPlay.velocityY) * 1.025;
-      ballPlay.velocityX += ((ballPlay.ballX - ballPlay.penguinX) / penguinReach) * .12;
+    const penguinReach = Math.min(w * .14, h * .18);
+    const penguinDistance = Math.hypot(ballPlay.ballX - ballPlay.penguinX, ballPlay.ballY - ballPlay.penguinY);
+    const guaranteedReturn = ballPlay.ballY <= h * .18;
+    if (ballPlay.velocityY < 0 && (penguinDistance < penguinReach || guaranteedReturn)) {
+      ballPlay.ballY = ballPlay.penguinY + penguinReach;
+      ballPlay.velocityY = Math.abs(ballPlay.velocityY) * (.98 + Math.random() * .15);
+      ballPlay.velocityX = Math.max(-.48, Math.min(.48, (Math.random() - .5) * .72 + ((ballPlay.ballX - ballPlay.penguinX) / penguinReach) * .16));
       ballPlay.swingUntil = now + 180;
       ballGameStatus.textContent = '企鵝擊球！';
+      choosePenguinTactic(now);
     }
     if (ballPlay.ballY > h + radius * 2) {
+      if (ballCombo > 0) applyAffectionGain(Math.min(ballCombo, 5), 'ball');
       ballCombo = 0;
       ballComboValue.textContent = '0';
       ballGameStatus.textContent = '漏接了，再來一次！';
@@ -1052,6 +1163,7 @@ function ballGameFrame(now) {
 }
 
 function setBallMode(enabled) {
+  if (enabled && affectionRequired(10)) return;
   if (enabled && (isSettingsOpen() || isDead || isFeedingMode || isRpsResolving || isHideAndSeekMode)) return;
   isBallMode = enabled;
   document.body.classList.toggle('ball-mode', enabled);
@@ -1062,7 +1174,7 @@ function setBallMode(enabled) {
   setInteractionMode(false); setSingingMode(false); setRpsMode(false);
   walking = false; pet.classList.remove('walking');
   resizeBallCourt();
-  ballPlay.playerX = ballPlay.width * .5; ballPlay.penguinX = ballPlay.width * .5; ballPlay.pausedUntil = 0;
+  ballPlay.playerX = ballPlay.width * .5; ballPlay.penguinX = ballPlay.width * .5; ballPlay.penguinY = ballPlay.height * .24; ballPlay.penguinTargetX = ballPlay.penguinX; ballPlay.penguinTargetY = ballPlay.penguinY; ballPlay.nextTacticAt = 0; ballPlay.pausedUntil = 0;
   stopGenshinOutsideMain();
   ballCombo = 0;
   ballComboValue.textContent = '0';
@@ -1178,6 +1290,7 @@ function clearCatchItems() {
 }
 
 function setCatchMode(enabled) {
+  if (enabled && affectionRequired()) return;
   if (enabled && (isSettingsOpen() || isDead || isRpsResolving)) return;
   isCatchMode = enabled;
   document.body.classList.toggle('catch-mode', enabled);
@@ -1206,6 +1319,7 @@ function setCatchMode(enabled) {
 }
 
 function setAdventureMenu(enabled) {
+  if (enabled && affectionRequired()) return;
   if (enabled && (isSettingsOpen() || isDead || isRpsResolving)) return;
   isAdventureMenuOpen = enabled;
   document.body.classList.toggle('adventure-menu-open', enabled);
@@ -1294,18 +1408,26 @@ function chooseMiningPick() {
 }
 
 function setMiningMode(enabled) {
+  if (enabled && affectionRequired()) return;
   if (enabled && (isSettingsOpen() || isDead || isRpsResolving)) return;
   isMiningMode = enabled;
   document.body.classList.toggle('mining-mode', enabled);
   miningGame.inert = !enabled;
   miningGame.setAttribute('aria-hidden', String(!enabled));
   clearMiningTimers();
-  if (!enabled) return;
+  if (!enabled) {
+    if (miningRunHadAttempt) applyAffectionGain(miningRunFoundStone ? 3 : 1, 'mining');
+    miningRunHadAttempt = false;
+    miningRunFoundStone = false;
+    return;
+  }
   stopGenshinOutsideMain();
   isAdventureMenuOpen = false; document.body.classList.remove('adventure-menu-open'); adventureMenu.inert = true;
   setFeedingMode(false); setInteractionMode(false); setSingingMode(false); setRpsMode(false); setBallMode(false); setCatchMode(false);
   walking = false; pet.classList.remove('walking');
   miningPenguin.style.left = '13%'; miningPenguin.style.top = '72%';
+  miningRunHadAttempt = false;
+  miningRunFoundStone = false;
   miningResult.className = 'mining-result'; renderMiningRocks();
   if (miningIsTired()) {
     miningPickStatus.textContent = '飽食度不足';
@@ -1331,11 +1453,13 @@ function mineRock(rock) {
   if (!isMiningMode || !miningPick) return;
   if (miningIsTired()) { showMiningTiredAndExit(); return; }
   rock.classList.add('is-breaking');
+  miningRunHadAttempt = true;
   const gotStone = Math.random() < miningPick.chance;
   window.setTimeout(() => {
     if (!isMiningMode) return;
     rock.classList.remove('is-breaking');
     if (gotStone) {
+      miningRunFoundStone = true;
       foodInventory.stone = Math.min(FOOD_MAX_QUANTITY, foodInventory.stone + 1); saveFoodInventory(); updateFoodPicker();
       hunger = Math.max(0, hunger - MINING_HUNGER_COST); renderHunger(); saveGameState();
       showMiningResult('挖到石頭了！', 'is-success');
@@ -1419,6 +1543,7 @@ function resetHideGameBoard() {
 }
 
 function setHideAndSeekMode(enabled) {
+  if (enabled && affectionRequired(30)) return;
   if (enabled && (isSettingsOpen() || isDead || isRpsResolving)) return;
   isHideAndSeekMode = enabled;
   document.body.classList.toggle('hide-and-seek-mode', enabled);
@@ -1500,6 +1625,7 @@ function finishHideAndSeekRound(userWon) {
   hideGameResult.classList.add('is-visible');
   if (userWon) playSound(screamSound);
   else playSound(penguinWinSound);
+  applyAffectionGain(userWon ? 3 : 1, 'hide-and-seek');
   hideGameIntro.hidden = true;
   hideGameNextRoundTimer = window.setTimeout(() => {
     if (isHideAndSeekMode && !isDead) beginHideAndSeekRound();
@@ -1662,10 +1788,8 @@ function collectFood() {
   updateFoodPicker();
   foodCollectedDuringJump = feedingJumpActive;
   hunger = Math.min(MAX_HUNGER, hunger + (isStone ? STONE_HUNGER_GAIN : FEED_HUNGER_GAIN));
-  affection = Math.min(MAX_AFFECTION, affection + (isStone ? STONE_AFFECTION_GAIN : FEED_AFFECTION_GAIN));
+  applyAffectionGain(isStone ? STONE_AFFECTION_GAIN : FEED_AFFECTION_GAIN, 'feeding');
   renderHunger();
-  renderAffection();
-  saveGameState();
   removeActiveFood();
   resetMoralSoundSequence(true);
   pet.classList.remove('feeding-chasing', 'feeding-running-away', 'walking');
@@ -1891,7 +2015,7 @@ function crazyFly() {
 }
 
 pet.addEventListener('click', (event) => {
-  if (isFeedingMode || isSingingMode || isRpsMode || isRpsResolving || isSettingsOpen() || isDead) return;
+  if (affection === 0 || isFeedingMode || isSingingMode || isRpsMode || isRpsResolving || isSettingsOpen() || isDead) return;
   if (suppressNextClick) {
     suppressNextClick = false;
     return;
@@ -2142,8 +2266,8 @@ function restartGame() {
   clickCount = 0;
   health = MAX_HEALTH;
   hunger = 6;
-  affection = 40;
-  foodInventory.apple = 0;
+  affection = 0;
+  foodInventory.apple = 1;
   foodInventory.stone = 0;
   position = 42;
   stopSound(screamSound);
@@ -2169,9 +2293,8 @@ function restartGame() {
 function showHurtEffect(damage, cause, visualTarget = pet) {
   if (isDead) return;
   health = Math.max(0, health - damage);
-  affection = Math.max(0, affection - damage * AFFECTION_LOSS_PER_DAMAGE);
+  applyAffectionLoss(Math.ceil(damage / 10) * AFFECTION_LOSS_PER_10_DAMAGE);
   renderHealth();
-  renderAffection();
   saveGameState();
   if (health === 0) {
     triggerDeath(cause);
@@ -2229,7 +2352,7 @@ function healFromFullHunger() {
 }
 
 pet.addEventListener('pointerdown', (event) => {
-  if (isFeedingMode || isSingingMode || isRpsMode || isRpsResolving || isHideAndSeekMode || isSettingsOpen() || isDead || isFalling || pet.classList.contains('jumping') || pet.classList.contains('spinning') || pet.classList.contains('crazy-flying')) return;
+  if (affection === 0 || isFeedingMode || isSingingMode || isRpsMode || isRpsResolving || isHideAndSeekMode || isSettingsOpen() || isDead || isFalling || pet.classList.contains('jumping') || pet.classList.contains('spinning') || pet.classList.contains('crazy-flying')) return;
   unlockGameSounds();
   const rect = pet.getBoundingClientRect();
   dragStartX = event.clientX;
@@ -2421,6 +2544,14 @@ window.GugaDebugTools?.init({
     renderHunger();
     saveGameState();
     healFromFullHunger();
+  },
+  addAffection() {
+    const gained = Math.min(10, MAX_AFFECTION - affection);
+    if (!gained) return;
+    affection += gained;
+    renderAffection();
+    saveGameState();
+    showAffectionPopup(gained);
   },
   cycleCloudCount() {
     const currentCount = debugCloudCount ?? cloudLayer.childElementCount;
