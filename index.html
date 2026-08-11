@@ -200,6 +200,12 @@
         </div>
       </section>
     </main>
+    <script>
+      (() => {
+        const hour = new Date().getHours();
+        document.body.classList.toggle("is-night", hour < 6 || hour >= 18);
+      })();
+    </script>
     <script src="app-20260812-default-apples1.js"></script>
   </body>
 </html>
