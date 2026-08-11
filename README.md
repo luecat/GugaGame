@@ -71,6 +71,6 @@ node --test tests/scp-parser.test.js
 
 解析器使用固定版本的 [fflate 0.8.3](https://github.com/101arrowz/fflate) 解壓縮；授權文字保存在 `vendor/fflate-LICENSE.txt`。
 
-## GitHub Pages
+## Cloudflare Pages
 
-https://luecat.github.io/GugaGame/
+https://luecat.com/
