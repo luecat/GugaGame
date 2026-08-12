@@ -12,7 +12,7 @@
     <meta property="og:type" content="website" />
     <title>Gugagame</title>
     <link rel="preload" as="image" href="image/gugugaga-sing.png?v=20260803-13" />
-    <link rel="stylesheet" href="style-20260812-popup-context1.css" />
+    <link rel="stylesheet" href="style-20260812-popup-context1.css?v=20260812-kami5" />
     <!-- TEST-ONLY DEBUG MODULE: beta only; never include this in production. -->
     <link rel="stylesheet" href="test-only/debug/debug-tools-20260812-context1.css" />
   </head>
@@ -106,6 +106,23 @@
         <img src="image/gugugaga-white.png" alt="企鵝" draggable="false" />
       </button>
       <div id="affection-popups" class="affection-popups" aria-live="polite" aria-atomic="false"></div>
+      <dialog id="song-invitation" class="song-invitation" aria-labelledby="song-invitation-title" aria-describedby="song-invitation-message">
+        <div class="song-invitation-card">
+          <h1 id="song-invitation-title">湊企鵝有事想跟你說</h1>
+          <p id="song-invitation-message">要現在前往嗎？</p>
+          <div id="song-invitation-actions" class="song-invitation-actions">
+            <button id="decline-song-invitation" type="button">不要</button>
+            <button id="accept-song-invitation" class="is-primary" type="button">前往</button>
+          </div>
+          <div id="song-decline-confirmation" class="song-invitation-confirmation" hidden>
+            <p>確定拒絕後，這段事件將永久無法再次觸發，歌曲也不會解鎖。</p>
+            <div class="song-invitation-actions">
+              <button id="back-song-invitation" type="button">返回</button>
+              <button id="confirm-decline-song-invitation" class="is-danger" type="button">確定拒絕</button>
+            </div>
+          </div>
+        </div>
+      </dialog>
       <section class="feature-panel" aria-label="功能專區">
         <div class="feature-actions">
           <button id="feed-button" type="button" aria-label="餵食企鵝">
@@ -135,6 +152,7 @@
         <div id="singing-picker" class="singing-picker" aria-label="唱歌模式" aria-hidden="true" inert>
           <button id="cancel-singing-button" type="button">取消唱歌</button>
           <button id="singing-song-button" type="button">壱雫空</button>
+          <button id="kimi-no-kamisama-song-button" type="button" hidden>君の神様になりたい</button>
         </div>
         <div id="rps-picker" class="rps-picker" aria-label="猜拳模式" aria-hidden="true" inert>
           <button id="end-rps-button" class="rps-end-button" type="button">結束猜拳</button>
@@ -229,6 +247,6 @@
       })();
     </script>
     <script src="test-only/debug/debug-tools-20260812-affection1.js"></script>
-    <script src="app-20260812-beta-sync1.js"></script>
+    <script src="app-20260812-beta-sync1.js?v=20260812-kami5"></script>
   </body>
 </html>
