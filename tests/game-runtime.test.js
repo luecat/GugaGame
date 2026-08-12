@@ -33,6 +33,14 @@ test('mobile launch controls use one activation path', () => {
   assert.match(source, /if \(enabled === isBallMode\) return true;/);
 });
 
+test('a visible settings gear is never isolated from input', () => {
+  assert.match(source, /const settingsAvailable = !isDead && !isMandatoryFirstSong && !songInvitation\.open;/);
+  assert.match(source, /settingsButton\.hidden = !settingsAvailable;/);
+  assert.match(source, /settingsButton\.disabled = !settingsAvailable;/);
+  assert.match(source, /if \(child === settingsButton\) child\.inert = !settingsAvailable;/);
+  assert.match(source, /closeCompetingModes\('settings'\)/);
+});
+
 test('save codes are bounded before BigInt decoding', () => {
   assert.match(html, /<textarea id="save-code"[^>]*maxlength="128"/);
   const lengthCheck = source.indexOf("code.length > SAVE_CODE_MAX_INPUT_LENGTH");
