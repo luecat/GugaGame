@@ -52,8 +52,10 @@ test('runtime selectors resolve and document ids are unique', () => {
   });
 });
 
-test('public home page has no SCP parser or rhythm-game entry point', () => {
+test('beta home exposes only the test-marked SCP game entry', () => {
   const html = read('index.html');
-  assert.doesNotMatch(html, /href=["'][^"']*scp-(?:game|parser)/i);
+  assert.match(html, /href=["']scp-game\.html["'][^>]*data-test-module=["']scp-rhythm["'][^>]*data-release-scope=["']beta-only["']/i);
+  assert.equal((html.match(/href=["'][^"']*scp-game\.html/gi) ?? []).length, 1);
+  assert.doesNotMatch(html, /href=["'][^"']*scp-parser/i);
   assert.doesNotMatch(html, /src=["'][^"']*scp-(?:game|parser)/i);
 });

@@ -77,8 +77,9 @@ body.is-night .affection-popup, body.mining-mode .affection-popup { color: #fff;
 .death-content button { justify-self: center; width: min(280px, 100%); min-height: 48px; padding: 12px 20px; border: 0; border-radius: 2px; background: #555; color: white; cursor: pointer; font: inherit; font-size: 16px; font-weight: 800; }
 .death-content button:focus-visible { outline: 3px solid white; outline-offset: 4px; }
 .feature-panel { position: absolute; z-index: 4; right: 18px; bottom: 18px; display: grid; gap: 7px; padding: 11px; border-radius: 10px; background: #ffffffc4; color: #38515b; font-size: 12px; font-weight: 700; transition: opacity .2s ease, visibility .2s ease; }
-.feature-panel button { padding: 7px 9px; border: 0; border-radius: 6px; background: #38515b; color: white; cursor: pointer; font: inherit; touch-action: manipulation; }
-.feature-panel button { display: flex; align-items: center; justify-content: center; gap: 5px; } .feature-panel button svg { width: 15px; height: 15px; fill: #ef6f71; stroke: #ef6f71; stroke-width: 1.5; }
+.feature-panel button, .feature-panel .feature-link { min-height: 0; padding: 7px 9px; border: 0; border-radius: 6px; background: #38515b; color: white; cursor: pointer; font: inherit; font-weight: inherit; text-decoration: none; touch-action: manipulation; }
+.feature-panel button, .feature-panel .feature-link { display: flex; align-items: center; justify-content: center; gap: 5px; } .feature-panel button svg, .feature-panel .feature-link svg { width: 15px; height: 15px; fill: #ef6f71; stroke: #ef6f71; stroke-width: 1.5; }
+.feature-panel .feature-link:focus-visible { outline: 3px solid #38515b; outline-offset: 3px; }
 .feature-actions { display: grid; grid-template-columns: repeat(2, minmax(72px, 1fr)); gap: 7px; }
 .adventure-menu { position: fixed; z-index: 80; inset: 0; display: grid; grid-template-rows: auto 1fr; gap: clamp(18px, 4vh, 42px); padding: max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left)); background: #b9e8f7; color: #111; visibility: hidden; opacity: 0; pointer-events: none; transition: opacity .2s ease, visibility 0s linear .2s; }
 body.adventure-menu-open .adventure-menu { visibility: visible; opacity: 1; pointer-events: auto; transition-delay: 0s; }
@@ -129,11 +130,13 @@ body.feeding-mode .food-picker { display: grid; }
 body.feeding-mode #feed-button { background: #b45b5b; }
 body.feeding-mode .feature-actions { grid-template-columns: 1fr; }
 body.feeding-mode #interact-button { display: none; }
+body.feeding-mode #rhythm-game-link { display: none; }
 body.feeding-mode #adventure-button { display: none; }
 .interaction-picker button { min-height: 0; padding: 7px 9px; background: #52747f; }
 body.interaction-mode .interaction-picker { display: grid; }
 body.interaction-mode .feature-actions { grid-template-columns: 1fr; }
 body.interaction-mode #feed-button { display: none; }
+body.interaction-mode #rhythm-game-link { display: none; }
 body.interaction-mode #adventure-button { display: none; }
 body.interaction-mode #interact-button { background: #b45b5b; }
 .singing-picker { display: none; grid-template-columns: minmax(0, 1fr); width: 100%; gap: 7px; }
@@ -309,8 +312,8 @@ body.is-night { background: #17284d; } body.is-night .sky { background: #263f76;
   .affection-track { height: 7px; }
   .feature-panel { bottom: max(10px, env(safe-area-inset-bottom)); padding: 9px; }
   .feature-panel { right: 10px; }
-  .feature-panel button { min-height: 40px; padding: 8px 10px; }
-  .feature-actions { grid-template-columns: repeat(3, minmax(64px, 1fr)); }
+  .feature-panel button, .feature-panel .feature-link { min-height: 40px; padding: 8px 10px; }
+  .feature-actions { grid-template-columns: repeat(2, minmax(64px, 1fr)); }
   .food-picker, .interaction-picker { grid-template-columns: repeat(2, minmax(64px, 1fr)); }
   .feeding-item { width: 52px; height: 52px; }
   .rps-result { top: 19%; width: calc(100vw - 32px); padding: 11px 14px; font-size: clamp(17px, 5.4vw, 25px); }
