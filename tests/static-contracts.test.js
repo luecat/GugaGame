@@ -59,3 +59,21 @@ test('beta home exposes only the test-marked SCP game entry', () => {
   assert.doesNotMatch(html, /href=["'][^"']*scp-parser/i);
   assert.doesNotMatch(html, /src=["'][^"']*scp-(?:game|parser)/i);
 });
+
+test('rhythm setup exposes calibration before chart selection and loads timing core first', () => {
+  const html = read('scp-game.html');
+  assert.ok(html.indexOf('id="latency-calibrator"') < html.indexOf('id="scp-file"'));
+  assert.ok(html.indexOf('src="rhythm-core.js') < html.indexOf('src="scp-game.js'));
+  [
+    'speed-slider',
+    'lane-tilt-slider',
+    'lane-width-slider',
+    'judgment-line-slider',
+    'volume-slider',
+    'input-offset-slider',
+    'visual-offset-slider',
+  ].forEach((id) => assert.match(html, new RegExp(`id=["']${id}["']`)));
+  ['calibration-status', 'start-calibration', 'calibration-tap', 'apply-calibration']
+    .forEach((id) => assert.match(html, new RegExp(`id=["']${id}["']`)));
+  assert.equal((html.match(/data-calibration-beat=/g) ?? []).length, 4);
+});

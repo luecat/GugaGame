@@ -7,7 +7,7 @@
     <meta name="color-scheme" content="dark only" />
     <meta name="theme-color" content="#101827" />
     <title>GugaGame SCP 音遊</title>
-    <link rel="stylesheet" href="scp-game.css" />
+    <link rel="stylesheet" href="scp-game.css?v=20260813-2" />
   </head>
   <body>
     <main id="game-shell" class="game-shell">
@@ -18,6 +18,60 @@
         <p class="eyebrow">Sonolus Collection Player</p>
         <h1 id="setup-title">載入 SCP，直接遊玩</h1>
         <p class="intro">譜面與音樂只會在瀏覽器內解開，不會上傳。支援多點觸控，以及鍵盤 S D F J K L。</p>
+
+        <section id="latency-calibrator" class="calibration-card" aria-labelledby="calibration-title">
+          <p class="section-kicker">開始前校正</p>
+          <h2 id="calibration-title">四拍延遲測試</h2>
+          <p>聽前三拍並預測速度，在你認為第四拍應該出現的瞬間按下。第四拍不會播放提示音。</p>
+          <ol id="calibration-beats" class="calibration-beats" aria-label="四拍進度">
+            <li data-calibration-beat="1"><span>1</span></li>
+            <li data-calibration-beat="2"><span>2</span></li>
+            <li data-calibration-beat="3"><span>3</span></li>
+            <li data-calibration-beat="4"><span>4</span><small>按下</small></li>
+          </ol>
+          <p id="calibration-status" class="calibration-status" aria-live="polite">尚未測試。一次校正包含八輪，每輪都在第四拍按下，會以中位數排除偶發誤差。</p>
+          <div class="calibration-actions">
+            <button id="start-calibration" type="button">開始八輪測試</button>
+            <button id="calibration-tap" type="button" disabled>第四拍按下</button>
+            <button id="apply-calibration" type="button" disabled>套用建議值</button>
+          </div>
+          <p class="setting-help">也可按空白鍵或 Enter。測得的是音訊輸出、輸入裝置與落拍習慣的合成值；完成後需確認才會套用，仍可手動微調。</p>
+        </section>
+
+        <section id="play-settings" class="settings-section" aria-labelledby="settings-title">
+          <div class="settings-header">
+            <div>
+              <p class="section-kicker">Play style</p>
+              <h2 id="settings-title">遊玩設定</h2>
+            </div>
+            <button id="reset-settings" class="secondary-button" type="button">恢復預設</button>
+          </div>
+          <div class="play-settings">
+            <label for="speed-slider">流速 <output id="speed-output" for="speed-slider">7.0</output>
+              <input id="speed-slider" type="range" min="1" max="15" step="0.1" value="7" />
+            </label>
+            <label for="lane-tilt-slider">軌道傾斜 <output id="lane-tilt-output" for="lane-tilt-slider">100%</output>
+              <input id="lane-tilt-slider" type="range" min="0" max="100" step="1" value="100" />
+            </label>
+            <label for="lane-width-slider">軌道寬度 <output id="lane-width-output" for="lane-width-slider">100%</output>
+              <input id="lane-width-slider" type="range" min="55" max="130" step="1" value="100" />
+            </label>
+            <label for="judgment-line-slider">判定線高度 <output id="judgment-line-output" for="judgment-line-slider">86%</output>
+              <input id="judgment-line-slider" type="range" min="68" max="90" step="1" value="86" />
+            </label>
+            <label for="volume-slider">音量 <output id="volume-output" for="volume-slider">100%</output>
+              <input id="volume-slider" type="range" min="0" max="100" step="1" value="100" />
+            </label>
+            <label for="input-offset-slider">輸入延遲補償 <output id="input-offset-output" for="input-offset-slider">0 ms</output>
+              <input id="input-offset-slider" type="range" min="-300" max="300" step="1" value="0" />
+              <small>正值補償較晚送達的輸入，只改變判定。</small>
+            </label>
+            <label for="visual-offset-slider">畫面偏移 <output id="visual-offset-output" for="visual-offset-slider">0 ms</output>
+              <input id="visual-offset-slider" type="range" min="-200" max="200" step="1" value="0" />
+              <small>正值讓 note 較早抵達判定線，不改變判定。</small>
+            </label>
+          </div>
+        </section>
 
         <label class="file-button">
           <span>選擇 .scp 檔案</span>
@@ -35,14 +89,6 @@
           </div>
         </article>
 
-        <div id="play-settings" class="play-settings" hidden>
-          <label>流速 <output id="speed-output">7</output>
-            <input id="speed-slider" type="range" min="1" max="10" step="1" value="7" />
-          </label>
-          <label>判定偏移 <output id="offset-output">0 ms</output>
-            <input id="offset-slider" type="range" min="-250" max="250" step="5" value="0" />
-          </label>
-        </div>
         <button id="start-game" class="start-button" type="button" disabled>開始遊戲</button>
       </section>
 
@@ -81,6 +127,7 @@
     </main>
     <script src="vendor/fflate-0.8.3.js?v=20260805-2"></script>
     <script src="scp-parser.js?v=20260805-2"></script>
-    <script src="scp-game.js?v=20260805-2"></script>
+    <script src="rhythm-core.js?v=20260813-2"></script>
+    <script src="scp-game.js?v=20260813-2"></script>
   </body>
 </html>
