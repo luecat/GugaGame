@@ -134,6 +134,7 @@ let miningRollInterval;
 let miningResultTimer;
 let miningHoldTimer;
 let miningExitTimer;
+const miningActionTimers = new Set();
 let miningPointerId = null;
 let miningTargetRock = null;
 let miningPointerStartX = 0;
@@ -147,8 +148,9 @@ let hideGameNextRoundTimer;
 let ballCombo = 0;
 const BALL_PLAYER_Y = .80;
 let penguinWinStreak = 0;
-let rpsDisabledControls = null;
 let rpsResultResetTimer;
+let rpsRoundId = 0;
+let ballResetTimer;
 const normalPetImageSource = petImage.getAttribute('src');
 const singingPetImageSource = new URL('image/gugugaga-sing.png?v=20260803-13', document.baseURI).href;
 const RPS_PENGUIN_IMAGES = {
@@ -179,7 +181,18 @@ let stoneGreetingCompletedFood = null;
 let stoneGreetingTimer;
 let lastFeedingJumpAt = 0;
 let feedingBehaviorTimer;
+const feedingActionTimers = new Set();
 let walkTimer;
+let walkAnimationTimer;
+let cloudUpdateTimer;
+let dayNightTimer;
+let healTimer;
+let fallAnimationFrame;
+let runtimeSuspended = document.hidden;
+let runtimeResumeMode = null;
+let modeTransitionInProgress = false;
+let invitationResumeMode = null;
+let isOpeningSongInvitation = false;
 const AudioContextClass = window.AudioContext || window.webkitAudioContext;
 let audioContext;
 let masterGainNode;
@@ -202,6 +215,10 @@ const AFFECTION_STORAGE_VERSION = 'trust-growth-v1';
 const SAVE_CODE_PREFIX = 'GG1';
 const SAVE_CODE_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 const SAVE_CODE_CHECKSUM_MODULUS = 65_536;
+const SAVE_CODE_MAX_INPUT_LENGTH = 128;
+const SAVE_CODE_MAX_NORMALIZED_LENGTH = 64;
+let foodInventoryNeedsMigration = false;
+let storageWriteFailed = false;
 
 function readSongInvitationState() {
   try {
@@ -215,15 +232,25 @@ let songInvitationState = readSongInvitationState();
 
 function writeSongInvitationState(state) {
   songInvitationState = state;
-  try { window.localStorage.setItem(SONG_INVITATION_STORAGE_KEY, state); } catch {}
+  return writeStorageItem(SONG_INVITATION_STORAGE_KEY, state);
+}
+
+function writeStorageItem(key, value) {
+  try {
+    window.localStorage.setItem(key, value);
+    return true;
+  } catch (error) {
+    storageWriteFailed = true;
+    console.warn(`[storage] 無法保存 ${key}`, error);
+    return false;
+  }
 }
 
 function readFoodInventory() {
   const defaults = { apple: 10, stone: 0 };
   try {
     if (window.localStorage.getItem(FOOD_STORAGE_VERSION_KEY) !== FOOD_STORAGE_VERSION) {
-      window.localStorage.setItem(FOOD_STORAGE_VERSION_KEY, FOOD_STORAGE_VERSION);
-      window.localStorage.setItem(FOOD_STORAGE_KEY, JSON.stringify(defaults));
+      foodInventoryNeedsMigration = true;
       return defaults;
     }
     const stored = JSON.parse(window.localStorage.getItem(FOOD_STORAGE_KEY) || 'null');
@@ -240,10 +267,10 @@ function readFoodInventory() {
 let foodInventory = readFoodInventory();
 
 function writeFoodInventory() {
-  try {
-    window.localStorage.setItem(FOOD_STORAGE_VERSION_KEY, FOOD_STORAGE_VERSION);
-    window.localStorage.setItem(FOOD_STORAGE_KEY, JSON.stringify(foodInventory));
-  } catch {}
+  const inventorySaved = writeStorageItem(FOOD_STORAGE_KEY, JSON.stringify(foodInventory));
+  const versionSaved = inventorySaved && writeStorageItem(FOOD_STORAGE_VERSION_KEY, FOOD_STORAGE_VERSION);
+  if (versionSaved && inventorySaved) foodInventoryNeedsMigration = false;
+  return versionSaved && inventorySaved;
 }
 
 function clampInteger(value, minimum, maximum) {
@@ -264,12 +291,13 @@ function getSaveState() {
 
 function saveGameState(touchTimestamp = true) {
   if (touchTimestamp) lastStatusUpdatedAt = Math.floor(Date.now() / 60000);
-  try { window.localStorage.setItem(SAVE_STORAGE_KEY, JSON.stringify(getSaveState())); } catch {}
+  return writeStorageItem(SAVE_STORAGE_KEY, JSON.stringify(getSaveState()));
 }
 
 function saveFoodInventory() {
-  writeFoodInventory();
-  saveGameState();
+  const inventorySaved = writeFoodInventory();
+  const gameSaved = saveGameState();
+  return inventorySaved && gameSaved;
 }
 
 function restoreGameState() {
@@ -277,8 +305,10 @@ function restoreGameState() {
     const stored = JSON.parse(window.localStorage.getItem(SAVE_STORAGE_KEY) || 'null');
     if (!stored || typeof stored !== 'object') return;
     const needsAffectionMigration = window.localStorage.getItem(AFFECTION_STORAGE_VERSION_KEY) !== AFFECTION_STORAGE_VERSION;
-    foodInventory.apple = clampInteger(stored.apple, 0, FOOD_MAX_QUANTITY);
-    foodInventory.stone = clampInteger(stored.stone, 0, FOOD_MAX_QUANTITY);
+    if (!foodInventoryNeedsMigration) {
+      foodInventory.apple = clampInteger(stored.apple, 0, FOOD_MAX_QUANTITY);
+      foodInventory.stone = clampInteger(stored.stone, 0, FOOD_MAX_QUANTITY);
+    }
     health = clampInteger(stored.health, 1, 100);
     hunger = clampInteger(stored.hunger2, 0, 20) / 2;
     const now = Math.floor(Date.now() / 60000);
@@ -288,7 +318,7 @@ function restoreGameState() {
     affection = needsAffectionMigration ? 0 : Math.max(0, clampInteger(stored.affection, 0, 100) - missedPeriods);
     if (needsAffectionMigration && foodInventory.apple === 0) foodInventory.apple = 1;
     lastStatusUpdatedAt = now;
-    window.localStorage.setItem(AFFECTION_STORAGE_VERSION_KEY, AFFECTION_STORAGE_VERSION);
+    writeStorageItem(AFFECTION_STORAGE_VERSION_KEY, AFFECTION_STORAGE_VERSION);
   } catch {}
 }
 
@@ -335,10 +365,17 @@ function encodeSaveCode() {
 }
 
 function decodeSaveCode(code) {
+  if (typeof code !== 'string' || code.length > SAVE_CODE_MAX_INPUT_LENGTH) {
+    throw new Error('存檔碼過長。');
+  }
   const normalized = code.trim().replace(/[\s-]+/g, '');
+  if (normalized.length > SAVE_CODE_MAX_NORMALIZED_LENGTH) throw new Error('存檔碼過長。');
   if (!normalized.startsWith(SAVE_CODE_PREFIX)) throw new Error('這不是 GG1 存檔碼。');
   const raw = normalized.slice(SAVE_CODE_PREFIX.length);
   if (raw.length < 4) throw new Error('存檔碼不完整。');
+  if ([...raw].some((character) => !SAVE_CODE_ALPHABET.includes(character))) {
+    throw new Error('存檔碼含有不支援的字元。');
+  }
   const payload = raw.slice(0, -3);
   const checksum = raw.slice(-3);
   if (Number(decodeBase58(checksum)) !== saveChecksum(payload)) throw new Error('存檔碼校驗失敗，請確認是否完整貼上。');
@@ -403,9 +440,16 @@ function readSavedVolume() {
 let gameVolume = readSavedVolume();
 
 function createSound(path) {
-  const element = new Audio(path);
-  element.preload = 'auto';
-  return { element, buffer: null, bufferPromise: null, unlocked: false, unlocking: false, sources: new Set() };
+  const element = new Audio();
+  element.preload = 'none';
+  element.src = path;
+  return {
+    element,
+    buffer: null,
+    bufferPromise: null,
+    playbackGeneration: 0,
+    sources: new Set(),
+  };
 }
 
 const hurtSound = createSound('audio/痾啊.wav');
@@ -430,6 +474,7 @@ let singingAnimationFrame;
 let activeSingingSound = null;
 let singingPlaybackId = 0;
 let isMandatoryFirstSong = false;
+let singingCompletionTimer;
 
 function setMandatoryFirstSong(enabled) {
   isMandatoryFirstSong = enabled;
@@ -459,7 +504,7 @@ function setGameVolume(volume, persist = true) {
   volumeSlider.setAttribute('aria-valuetext', `${Math.round(gameVolume * 100)}%`);
   volumeControl.classList.toggle('is-muted', gameVolume === 0);
   if (!persist) return;
-  try { window.localStorage.setItem(VOLUME_STORAGE_KEY, String(gameVolume)); } catch {}
+  writeStorageItem(VOLUME_STORAGE_KEY, String(gameVolume));
 }
 
 volumeSlider.addEventListener('input', () => {
@@ -468,16 +513,17 @@ volumeSlider.addEventListener('input', () => {
 setGameVolume(gameVolume, false);
 
 copySaveCodeButton.addEventListener('click', async () => {
-  saveGameState();
+  storageWriteFailed = false;
+  const stateSaved = saveGameState();
   const code = encodeSaveCode();
   saveCodeField.value = code;
   saveCodeField.focus();
   saveCodeField.select();
   try {
     await navigator.clipboard.writeText(code);
-    setSaveCodeStatus('存檔碼已生成並複製。');
+    setSaveCodeStatus(stateSaved ? '存檔碼已生成並複製。' : '存檔碼已複製，但瀏覽器拒絕保存本機進度。', !stateSaved);
   } catch {
-    setSaveCodeStatus('存檔碼已生成，請自行複製備份。');
+    setSaveCodeStatus(stateSaved ? '存檔碼已生成，請自行複製備份。' : '存檔碼已生成，但瀏覽器拒絕保存本機進度。', !stateSaved);
   }
 });
 
@@ -491,10 +537,16 @@ importSaveCodeButton.addEventListener('click', () => {
     hunger = state.hunger2 / 2;
     affection = state.affection;
     lastStatusUpdatedAt = state.lastUpdatedAt;
-    writeFoodInventory();
-    saveGameState(false);
+    storageWriteFailed = false;
+    foodInventoryNeedsMigration = false;
+    const inventorySaved = writeFoodInventory();
+    const stateSaved = saveGameState(false);
     renderSavedState();
-    setSaveCodeStatus('已匯入存檔碼。');
+    const persisted = inventorySaved && stateSaved && !storageWriteFailed;
+    setSaveCodeStatus(
+      persisted ? '已匯入存檔碼。' : '已套用存檔碼，但瀏覽器拒絕保存；重新載入後可能復原。',
+      !persisted,
+    );
   } catch (error) {
     setSaveCodeStatus(error.message || '無法讀取存檔碼。', true);
   }
@@ -552,6 +604,93 @@ function getMinuteCloudCount(date = new Date()) {
 
 function isSettingsOpen() {
   return document.body.classList.contains('settings-open');
+}
+
+function getActiveRuntimeMode() {
+  if (isSettingsOpen()) return 'settings';
+  if (isFeedingMode) return 'feeding';
+  if (isInteractionMode) return 'interaction';
+  if (isSingingMode) return 'singing';
+  if (isRpsMode) return 'rps';
+  if (isBallMode) return 'ball';
+  if (isAdventureMenuOpen) return 'adventure';
+  if (isCatchMode) return 'catch';
+  if (isMiningMode) return 'mining';
+  if (isHideAndSeekMode) return 'hide';
+  return 'main';
+}
+
+function syncRuntimeIsolation() {
+  const overlayStates = new Map([
+    [adventureMenu, isAdventureMenuOpen],
+    [catchGame, isCatchMode],
+    [miningGame, isMiningMode],
+    [ballGame, isBallMode],
+    [hideAndSeekGame, isHideAndSeekMode],
+    [deathScreen, isDead && deathScreen.classList.contains('is-visible')],
+  ]);
+  const activeOverlay = [...overlayStates].find(([, active]) => active)?.[0] ?? null;
+  const activeMode = getActiveRuntimeMode();
+  const limitedMode = ['settings', 'feeding', 'interaction', 'singing', 'rps'].includes(activeMode);
+  [...world.children].forEach((child) => {
+    if (activeOverlay) child.inert = child !== activeOverlay;
+    else if (activeMode === 'settings') child.inert = child !== settingsButton && child !== settingsMenu;
+    else if (limitedMode) {
+      const isModeControl = child === featurePanel
+        || child === affectionPopups
+        || (activeMode === 'feeding' && child.classList.contains('feeding-item'))
+        || (activeMode === 'rps' && child === rpsResult);
+      child.inert = !isModeControl;
+    }
+    else if (overlayStates.has(child)) child.inert = !overlayStates.get(child);
+    else child.inert = false;
+  });
+}
+
+function focusRuntimeControl(control) {
+  window.requestAnimationFrame(() => {
+    if (!runtimeSuspended && control && !control.disabled && !control.closest('[inert]')) control.focus();
+  });
+}
+
+function closeCompetingModes(targetMode, options = {}) {
+  if (targetMode && runtimeSuspended) return false;
+  if (targetMode && isMandatoryFirstSong && targetMode !== 'singing') return false;
+  if (modeTransitionInProgress) return true;
+  modeTransitionInProgress = true;
+  try {
+    if (targetMode !== 'settings' && isSettingsOpen()) setSettingsOpen(false, { coordinated: true });
+    if (targetMode !== 'feeding' && isFeedingMode) setFeedingMode(false, { coordinated: true });
+    if (targetMode !== 'interaction' && isInteractionMode) setInteractionMode(false, { coordinated: true });
+    if (targetMode !== 'singing' && isSingingMode) setSingingMode(false, { coordinated: true, force: options.forceSinging });
+    if (targetMode !== 'rps' && isRpsMode) setRpsMode(false, { coordinated: true });
+    if (targetMode !== 'ball' && isBallMode) setBallMode(false, { coordinated: true });
+    if (targetMode !== 'adventure' && isAdventureMenuOpen) setAdventureMenu(false, { coordinated: true });
+    if (targetMode !== 'catch' && isCatchMode) setCatchMode(false, { coordinated: true });
+    if (targetMode !== 'mining' && isMiningMode) {
+      setMiningMode(false, { coordinated: true, awardRun: options.awardMining !== false });
+    }
+    if (targetMode !== 'hide' && isHideAndSeekMode) setHideAndSeekMode(false, { coordinated: true });
+  } finally {
+    modeTransitionInProgress = false;
+  }
+  if (targetMode && songInvitation.open && targetMode !== 'singing') return false;
+  syncRuntimeIsolation();
+  return true;
+}
+
+function resumeRuntimeMode(mode) {
+  if (!mode || mode === 'main' || runtimeSuspended || songInvitation.open || isDead) return;
+  if (mode === 'settings') setSettingsOpen(true);
+  else if (mode === 'feeding') setFeedingMode(true);
+  else if (mode === 'interaction') setInteractionMode(true);
+  else if (mode === 'singing') setSingingMode(true);
+  else if (mode === 'rps') setRpsMode(true);
+  else if (mode === 'ball') setBallMode(true);
+  else if (mode === 'adventure') setAdventureMenu(true);
+  else if (mode === 'catch') setCatchMode(true);
+  else if (mode === 'mining') setMiningMode(true);
+  else if (mode === 'hide') setHideAndSeekMode(true);
 }
 
 function canPlayGenshinSound() {
@@ -615,23 +754,24 @@ function updateCloudsFromClock() {
 }
 
 function scheduleNextCloudUpdate() {
+  window.clearTimeout(cloudUpdateTimer);
+  cloudUpdateTimer = undefined;
+  if (runtimeSuspended) return;
   const delay = CLOUD_TRAVEL_MS - (Date.now() % CLOUD_TRAVEL_MS);
-  window.setTimeout(() => {
+  cloudUpdateTimer = window.setTimeout(() => {
+    cloudUpdateTimer = undefined;
     updateCloudsFromClock();
     scheduleNextCloudUpdate();
   }, delay);
 }
 
-function toggleSettings() {
-  if (isMandatoryFirstSong) return;
-  const isOpen = document.body.classList.toggle('settings-open');
+function setSettingsOpen(isOpen, options = {}) {
+  if (isOpen === isSettingsOpen()) return true;
+  if (isOpen && (isMandatoryFirstSong || runtimeSuspended || isDead)) return false;
+  if (isOpen && !options.coordinated && !closeCompetingModes('settings')) return false;
+  document.body.classList.toggle('settings-open', isOpen);
   if (isOpen) {
     stopGenshinOutsideMain();
-    setFeedingMode(false);
-    setInteractionMode(false);
-    setSingingMode(false);
-    setRpsMode(false);
-    setBallMode(false);
   }
   if (isOpen && clickTimer) {
     window.clearTimeout(clickTimer);
@@ -643,6 +783,14 @@ function toggleSettings() {
   settingsButton.setAttribute('aria-expanded', String(isOpen));
   settingsButton.setAttribute('aria-label', isOpen ? '關閉設定' : '開啟設定');
   settingsMenu.setAttribute('aria-hidden', String(!isOpen));
+  syncRuntimeIsolation();
+  if (isOpen) focusRuntimeControl(volumeSlider);
+  else if (!options.coordinated) focusRuntimeControl(settingsButton);
+  return true;
+}
+
+function toggleSettings() {
+  return setSettingsOpen(!isSettingsOpen());
 }
 
 settingsButton.addEventListener('click', toggleSettings);
@@ -736,6 +884,7 @@ function renderKimiNoKamisamaUnlock() {
 }
 
 function resetSongInvitation() {
+  invitationResumeMode = null;
   writeSongInvitationState('pending');
   if (songInvitation.open) songInvitation.close();
   showSongInvitationChoice();
@@ -748,19 +897,31 @@ function showSongInvitationChoice() {
 }
 
 function maybeShowSongInvitation() {
-  if (affection < SONG_INVITATION_AFFECTION || songInvitationState !== 'pending' || songInvitation.open || isDead) return;
+  if (affection < SONG_INVITATION_AFFECTION || songInvitationState !== 'pending' || songInvitation.open || isDead || runtimeSuspended || isOpeningSongInvitation) return;
+  isOpeningSongInvitation = true;
+  invitationResumeMode = getActiveRuntimeMode();
+  closeCompetingModes(null, { forceSinging: true, awardMining: true });
   showSongInvitationChoice();
-  songInvitation.showModal();
+  try {
+    songInvitation.showModal();
+  } catch (error) {
+    console.warn('[invitation] 無法開啟歌曲邀請', error);
+    resumeAfterSongInvitation();
+  } finally {
+    isOpeningSongInvitation = false;
+  }
+}
+
+function resumeAfterSongInvitation() {
+  const mode = invitationResumeMode;
+  invitationResumeMode = null;
+  resumeRuntimeMode(mode);
 }
 
 function openUnlockedSongScreen() {
   if (songInvitation.open) songInvitation.close();
-  if (isSettingsOpen()) toggleSettings();
-  setFeedingMode(false);
-  setInteractionMode(false);
-  setRpsMode(false);
-  setBallMode(false);
-  setHideAndSeekMode(false);
+  invitationResumeMode = null;
+  closeCompetingModes('singing', { forceSinging: true, awardMining: true });
   setSingingMode(true);
   renderKimiNoKamisamaUnlock();
   window.requestAnimationFrame(() => kimiNoKamisamaSongButton.focus());
@@ -865,11 +1026,13 @@ function releaseCapturedFoodPointer(pointerId) {
   foodPointerCaptureTarget = null;
 }
 
-function setFeedingMode(enabled) {
+function setFeedingMode(enabled, options = {}) {
+  if (enabled === isFeedingMode) {
+    if (enabled) startFeedingBehaviorLoop();
+    return true;
+  }
   if (enabled && (isSettingsOpen() || isDead || isDragging || isFalling)) return;
-  if (enabled) setBallMode(false);
-  if (enabled) setInteractionMode(false);
-  if (enabled) setSingingMode(false);
+  if (enabled && !options.coordinated && !closeCompetingModes('feeding')) return false;
   isFeedingMode = enabled;
   document.body.classList.toggle('feeding-mode', enabled);
   foodPicker.inert = !enabled;
@@ -889,22 +1052,30 @@ function setFeedingMode(enabled) {
     pet.classList.remove('walking');
     unlockGameSounds();
     startFeedingBehaviorLoop();
-    return;
+    syncRuntimeIsolation();
+    return true;
   }
 
   stopFeedingBehaviorLoop();
+  feedingActionTimers.forEach((timer) => window.clearTimeout(timer));
+  feedingActionTimers.clear();
+  const activePointerId = pendingFoodDrag?.pointerId ?? foodDragPointerId;
+  if (activePointerId !== null && activePointerId !== undefined) releaseCapturedFoodPointer(activePointerId);
   removeActiveFood();
   pendingFoodDrag = null;
   feedingJumpActive = false;
   foodCollectedDuringJump = false;
   resetMoralSoundSequence(true);
   pet.classList.remove('feeding-chasing', 'feeding-running-away', 'walking');
+  syncRuntimeIsolation();
+  return true;
 }
 
-function setInteractionMode(enabled) {
+function setInteractionMode(enabled, options = {}) {
+  if (enabled === isInteractionMode) return true;
   if (enabled && affectionRequired()) return;
-  if (enabled && (isSettingsOpen() || isDead || isFeedingMode || isRpsMode || isRpsResolving || isBallMode || isHideAndSeekMode)) return;
-  if (enabled) setSingingMode(false);
+  if (enabled && (isSettingsOpen() || isDead || isRpsResolving)) return;
+  if (enabled && !options.coordinated && !closeCompetingModes('interaction')) return false;
   isInteractionMode = enabled;
   document.body.classList.toggle('interaction-mode', enabled);
   interactionPicker.inert = !enabled;
@@ -913,11 +1084,15 @@ function setInteractionMode(enabled) {
   interactButton.setAttribute('aria-label', enabled ? '結束互動選單' : '與企鵝互動');
   interactButtonLabel.textContent = enabled ? '取消互動' : '互動';
   if (enabled) stopGenshinOutsideMain();
+  syncRuntimeIsolation();
+  return true;
 }
 
-function setRpsMode(enabled) {
+function setRpsMode(enabled, options = {}) {
+  if (enabled === isRpsMode) return true;
   if (enabled && affectionRequired(10)) return;
-  if (enabled && (isSettingsOpen() || isDead || isFeedingMode || isSingingMode || isRpsResolving || isBallMode || isHideAndSeekMode)) return;
+  if (enabled && (isSettingsOpen() || isDead || isRpsResolving)) return;
+  if (enabled && !options.coordinated && !closeCompetingModes('rps')) return false;
   isRpsMode = enabled;
   document.body.classList.toggle('rps-mode', enabled);
   rpsPicker.inert = !enabled;
@@ -933,46 +1108,64 @@ function setRpsMode(enabled) {
     rpsResult.textContent = '選一個出拳吧';
     unlockGameSounds();
   } else {
+    rpsRoundId += 1;
+    setRpsPlaybackLock(false);
     window.clearTimeout(rpsResultResetTimer);
     rpsResultResetTimer = undefined;
     petImage.src = normalPetImageSource;
     petImage.alt = '企鵝';
     rpsResult.textContent = '選一個出拳吧';
   }
+  syncRuntimeIsolation();
+  if (!enabled && !options.coordinated) focusRuntimeControl(interactButton);
+  return true;
 }
 
 function setRpsPlaybackLock(locked) {
+  if (isRpsResolving === locked) return;
   isRpsResolving = locked;
   document.body.classList.toggle('rps-resolving', locked);
-  if (locked) {
-    rpsDisabledControls = new Map();
-    document.querySelectorAll('button, input, select').forEach((control) => {
-      rpsDisabledControls.set(control, control.disabled);
-      control.disabled = true;
-    });
-    return;
-  }
-  rpsDisabledControls?.forEach((wasDisabled, control) => { control.disabled = wasDisabled; });
-  rpsDisabledControls = null;
+  rpsChoiceButtons.forEach((button) => { button.disabled = locked; });
 }
 
-function waitForAnimation(element, animationName) {
+function waitForAnimation(element, animationName, timeoutMs = 1600) {
   return new Promise((resolve) => {
+    let timer;
     const finish = (event) => {
       if (event && (event.target !== element || event.animationName !== animationName)) return;
       element.removeEventListener('animationend', finish);
+      element.removeEventListener('animationcancel', finish);
+      window.clearTimeout(timer);
       resolve();
     };
     element.addEventListener('animationend', finish);
+    element.addEventListener('animationcancel', finish);
+    timer = window.setTimeout(() => finish(), timeoutMs);
   });
 }
 
-function playSoundAndWait(sound) {
-  return new Promise((resolve) => playSound(sound, resolve));
+function playSoundAndWait(sound, timeoutMs = 6000) {
+  return new Promise((resolve) => {
+    let completed = false;
+    const timer = window.setTimeout(complete, timeoutMs);
+    function complete() {
+      if (completed) return;
+      completed = true;
+      window.clearTimeout(timer);
+      resolve();
+    }
+    try {
+      playSound(sound, complete);
+    } catch (error) {
+      console.warn('[audio] 猜拳音效播放失敗', error);
+      complete();
+    }
+  });
 }
 
 async function playRpsRound(userHand) {
   if (!isRpsMode || isRpsResolving || isDead) return;
+  const roundId = ++rpsRoundId;
   window.clearTimeout(rpsResultResetTimer);
   rpsResultResetTimer = undefined;
   const isDraw = Math.random() < .2;
@@ -981,35 +1174,41 @@ async function playRpsRound(userHand) {
   const resultText = isDraw ? '平手！' : (shouldUserWin ? '你贏了！' : '企鵝贏了！');
 
   setRpsPlaybackLock(true);
-  pet.classList.remove('rps-user-win', 'rps-penguin-win');
-  petImage.src = RPS_PENGUIN_IMAGES[penguinHand];
-  petImage.alt = `企鵝出了${RPS_HAND_NAMES[penguinHand]}`;
-  rpsResult.innerHTML = `你出${RPS_HAND_NAMES[userHand]}，企鵝出${RPS_HAND_NAMES[penguinHand]}。${shouldUserWin ? '<strong class="rps-user-result">你贏了！</strong>' : resultText}`;
-  rpsResultResetTimer = window.setTimeout(() => {
-    rpsResult.textContent = '選一個出拳吧';
-    petImage.src = normalPetImageSource;
-    petImage.alt = '企鵝';
-    rpsResultResetTimer = undefined;
-  }, 2000);
-  void pet.offsetWidth;
+  let animationClass = '';
+  try {
+    pet.classList.remove('rps-user-win', 'rps-penguin-win');
+    petImage.src = RPS_PENGUIN_IMAGES[penguinHand];
+    petImage.alt = `企鵝出了${RPS_HAND_NAMES[penguinHand]}`;
+    rpsResult.innerHTML = `你出${RPS_HAND_NAMES[userHand]}，企鵝出${RPS_HAND_NAMES[penguinHand]}。${shouldUserWin ? '<strong class="rps-user-result">你贏了！</strong>' : resultText}`;
+    rpsResultResetTimer = window.setTimeout(() => {
+      rpsResult.textContent = '選一個出拳吧';
+      petImage.src = normalPetImageSource;
+      petImage.alt = '企鵝';
+      rpsResultResetTimer = undefined;
+    }, 2000);
+    void pet.offsetWidth;
 
-  if (isDraw) {
-    await new Promise((resolve) => window.setTimeout(resolve, 600));
-  } else {
-    const animationClass = shouldUserWin ? 'rps-user-win' : 'rps-penguin-win';
-    const animationName = shouldUserWin ? 'rps-disappointed-shake' : 'rps-victory-shake';
-    pet.classList.add(animationClass);
-    await Promise.all([
-      waitForAnimation(pet, animationName),
-      playSoundAndWait(shouldUserWin ? screamSound : penguinWinSound),
-    ]);
-    pet.classList.remove(animationClass);
+    if (isDraw) {
+      await new Promise((resolve) => window.setTimeout(resolve, 600));
+    } else {
+      animationClass = shouldUserWin ? 'rps-user-win' : 'rps-penguin-win';
+      const animationName = shouldUserWin ? 'rps-disappointed-shake' : 'rps-victory-shake';
+      pet.classList.add(animationClass);
+      await Promise.all([
+        waitForAnimation(pet, animationName),
+        playSoundAndWait(shouldUserWin ? screamSound : penguinWinSound),
+      ]);
+    }
+    if (roundId !== rpsRoundId || !isRpsMode || isDead || runtimeSuspended) return;
+    if (isDraw || shouldUserWin) penguinWinStreak = 0;
+    else penguinWinStreak += 1;
+    if (!isDraw) applyAffectionGain(shouldUserWin ? 1 : 3, 'rps');
+  } catch (error) {
+    console.warn('[rps] 無法完成猜拳回合', error);
+  } finally {
+    if (animationClass) pet.classList.remove(animationClass);
+    if (roundId === rpsRoundId) setRpsPlaybackLock(false);
   }
-  if (isDraw) penguinWinStreak = 0;
-  else if (shouldUserWin) penguinWinStreak = 0;
-  else penguinWinStreak += 1;
-  if (!isDraw) applyAffectionGain(shouldUserWin ? 1 : 3, 'rps');
-  setRpsPlaybackLock(false);
 }
 
 function stopSingingWaveAnimation() {
@@ -1080,9 +1279,11 @@ function startSingingWaveAnimation(getCurrentTime) {
   animate();
 }
 
-function setSingingMode(enabled) {
-  if (!enabled && isMandatoryFirstSong) return;
+function setSingingMode(enabled, options = {}) {
+  if (enabled === isSingingMode) return true;
+  if (!enabled && isMandatoryFirstSong && !options.force) return false;
   if (enabled && affectionRequired(30)) return;
+  if (enabled && !options.coordinated && !closeCompetingModes('singing')) return false;
   isSingingMode = enabled;
   document.body.classList.toggle('singing-mode', enabled);
   singingPicker.inert = !enabled;
@@ -1092,11 +1293,17 @@ function setSingingMode(enabled) {
   if (enabled) stopGenshinOutsideMain();
   if (!enabled) {
     singingPlaybackId += 1;
+    window.clearTimeout(singingCompletionTimer);
+    singingCompletionTimer = undefined;
     stopSound(singingSound);
     stopSound(kimiNoKamisamaSound);
     activeSingingSound = null;
     stopSingingWaveAnimation();
+    if (isMandatoryFirstSong) kimiNoKamisamaSongButton.disabled = false;
   }
+  syncRuntimeIsolation();
+  if (!enabled && !options.coordinated) focusRuntimeControl(interactButton);
+  return true;
 }
 
 function playSingingSong(sound = singingSound) {
@@ -1107,11 +1314,23 @@ function playSingingSong(sound = singingSound) {
   stopSound(singingSound);
   stopSound(kimiNoKamisamaSound);
   activeSingingSound = sound;
-  playSoundFallback(sound, () => {
+  let completed = false;
+  const complete = () => {
+    if (completed) return;
+    completed = true;
+    window.clearTimeout(singingCompletionTimer);
+    singingCompletionTimer = undefined;
     if (playbackId !== singingPlaybackId) return;
     if (sound === kimiNoKamisamaSound && isMandatoryFirstSong) setMandatoryFirstSong(false);
     if (isSingingMode && !isDead) applyAffectionGain(3, 'singing');
-  });
+  };
+  singingCompletionTimer = window.setTimeout(complete, sound === kimiNoKamisamaSound ? 65_000 : 45_000);
+  try {
+    playSound(sound, complete);
+  } catch (error) {
+    console.warn('[audio] 無法播放歌曲', error);
+    complete();
+  }
 }
 
 function playKimiNoKamisamaSong() {
@@ -1261,27 +1480,50 @@ function ballGameFrame(now) {
     }
     if (ballPlay.ballY > h + radius * 2) {
       if (ballCombo > 0) applyAffectionGain(Math.min(ballCombo, 5), 'ball');
+      if (!isBallMode || runtimeSuspended || songInvitation.open) {
+        ballPlay.frame = undefined;
+        return;
+      }
       ballCombo = 0;
       ballComboValue.textContent = '0';
       ballGameStatus.textContent = '漏接了，再來一次！';
       ballPlay.pausedUntil = now + 850;
-      window.setTimeout(() => { if (isBallMode) resetBallServe(); }, 850);
+      window.clearTimeout(ballResetTimer);
+      ballResetTimer = window.setTimeout(() => {
+        ballResetTimer = undefined;
+        if (isBallMode && !runtimeSuspended && !songInvitation.open) resetBallServe();
+      }, 850);
     }
   }
   drawBallCourt();
-  ballPlay.frame = window.requestAnimationFrame(ballGameFrame);
+  if (isBallMode && !runtimeSuspended && !songInvitation.open) {
+    ballPlay.frame = window.requestAnimationFrame(ballGameFrame);
+  } else ballPlay.frame = undefined;
 }
 
-function setBallMode(enabled) {
+function setBallMode(enabled, options = {}) {
+  if (enabled === isBallMode) return true;
   if (enabled && affectionRequired(10)) return;
-  if (enabled && (isSettingsOpen() || isDead || isFeedingMode || isRpsResolving || isHideAndSeekMode)) return;
+  if (enabled && (isSettingsOpen() || isDead || isRpsResolving)) return;
+  if (enabled && !options.coordinated && !closeCompetingModes('ball')) return false;
   isBallMode = enabled;
   document.body.classList.toggle('ball-mode', enabled);
   if (enabled) ballGame.removeAttribute('inert');
   else ballGame.setAttribute('inert', '');
   ballGame.setAttribute('aria-hidden', String(!enabled));
-  if (!enabled) { window.cancelAnimationFrame(ballPlay.frame); ballPlay.frame = undefined; return; }
-  setInteractionMode(false); setSingingMode(false); setRpsMode(false);
+  if (!enabled) {
+    window.cancelAnimationFrame(ballPlay.frame);
+    window.clearTimeout(ballResetTimer);
+    ballPlay.frame = undefined;
+    ballResetTimer = undefined;
+    syncRuntimeIsolation();
+    if (!options.coordinated) focusRuntimeControl(interactButton);
+    return true;
+  }
+  window.cancelAnimationFrame(ballPlay.frame);
+  window.clearTimeout(ballResetTimer);
+  ballPlay.frame = undefined;
+  ballResetTimer = undefined;
   walking = false; pet.classList.remove('walking');
   resizeBallCourt();
   ballPlay.playerX = ballPlay.width * .5; ballPlay.penguinX = ballPlay.width * .5; ballPlay.penguinY = ballPlay.height * .24; ballPlay.penguinTargetX = ballPlay.penguinX; ballPlay.penguinTargetY = ballPlay.penguinY; ballPlay.nextTacticAt = 0; ballPlay.pausedUntil = 0;
@@ -1289,6 +1531,9 @@ function setBallMode(enabled) {
   ballCombo = 0;
   ballComboValue.textContent = '0';
   resetBallServe(); ballPlay.lastTime = performance.now(); ballPlay.frame = window.requestAnimationFrame(ballGameFrame);
+  syncRuntimeIsolation();
+  focusRuntimeControl(closeBallGameButton);
+  return true;
 }
 
 function moveBallPaddle(clientX) {
@@ -1298,7 +1543,13 @@ function moveBallPaddle(clientX) {
 
 ballCourt.addEventListener('pointerdown', (event) => { event.preventDefault(); moveBallPaddle(event.clientX); ballCourt.setPointerCapture?.(event.pointerId); });
 ballCourt.addEventListener('pointermove', (event) => { if (isBallMode) { event.preventDefault(); moveBallPaddle(event.clientX); } });
-window.addEventListener('resize', () => { if (isBallMode) { resizeBallCourt(); resetBallServe(); } });
+window.addEventListener('resize', () => {
+  if (isBallMode) { resizeBallCourt(); resetBallServe(); }
+  if (isCatchMode) {
+    const fieldRect = catchField.getBoundingClientRect();
+    moveCatchPenguin(fieldRect.left + fieldRect.width * catchGameState.penguinX);
+  }
+});
 
 function renderCatchScore() {
   catchApples.textContent = String(catchApplesCount);
@@ -1335,7 +1586,7 @@ function spawnCatchItem() {
     item.append(art);
   }
   const size = 54;
-  const state = { type, x: Math.random() * Math.max(1, catchField.clientWidth - size), y: -size, speed: 180 + Math.random() * 130, element: item };
+  const state = { type, size, x: Math.random() * Math.max(1, catchField.clientWidth - size), y: -size, speed: 180 + Math.random() * 130, element: item };
   item.style.left = `${state.x}px`;
   item.style.top = `${state.y}px`;
   item.style.animation = 'none';
@@ -1343,10 +1594,13 @@ function spawnCatchItem() {
   catchItems.add(state);
 }
 
-function catchItemLanded(item) {
-  const penguinRect = catchPenguin.getBoundingClientRect();
-  const itemRect = item.element.getBoundingClientRect();
-  const overlaps = itemRect.right > penguinRect.left + 12 && itemRect.left < penguinRect.right - 12 && itemRect.bottom > penguinRect.top + 18 && itemRect.top < penguinRect.bottom;
+function catchItemLanded(item, fieldRect, penguinRect) {
+  const itemLeft = fieldRect.left + item.x;
+  const itemTop = fieldRect.top + item.y;
+  const overlaps = itemLeft + item.size > penguinRect.left + 12
+    && itemLeft < penguinRect.right - 12
+    && itemTop + item.size > penguinRect.top + 18
+    && itemTop < penguinRect.bottom;
   if (!overlaps) return false;
   if (item.type === 'apple') catchApplesCount += 1;
   else if (item.type === 'stone') catchStonesCount += 1;
@@ -1379,14 +1633,19 @@ function settleCatchRewards() {
 }
 
 function catchGameFrame(timestamp) {
-  if (!isCatchMode) return;
+  if (!isCatchMode || runtimeSuspended || songInvitation.open) {
+    catchAnimationFrame = undefined;
+    return;
+  }
   const delta = Math.min(.04, Math.max(0, (timestamp - catchGameState.lastTime) / 1000 || 0));
   catchGameState.lastTime = timestamp;
   const groundTop = catchField.clientHeight * .8;
+  const fieldRect = catchField.getBoundingClientRect();
+  const penguinRect = catchPenguin.getBoundingClientRect();
   catchItems.forEach((item) => {
     item.y += item.speed * delta;
     item.element.style.top = `${item.y}px`;
-    if (catchItemLanded(item) || item.y > groundTop) {
+    if (catchItemLanded(item, fieldRect, penguinRect) || item.y > groundTop) {
       item.element.remove();
       catchItems.delete(item);
     }
@@ -1399,9 +1658,11 @@ function clearCatchItems() {
   catchItems.clear();
 }
 
-function setCatchMode(enabled) {
+function setCatchMode(enabled, options = {}) {
+  if (enabled === isCatchMode) return true;
   if (enabled && affectionRequired()) return;
   if (enabled && (isSettingsOpen() || isDead || isRpsResolving)) return;
+  if (enabled && !options.coordinated && !closeCompetingModes('catch')) return false;
   isCatchMode = enabled;
   document.body.classList.toggle('catch-mode', enabled);
   catchGame.inert = !enabled;
@@ -1409,43 +1670,66 @@ function setCatchMode(enabled) {
   if (!enabled) {
     window.cancelAnimationFrame(catchAnimationFrame);
     window.clearInterval(catchSpawnTimer);
+    catchAnimationFrame = undefined;
+    catchSpawnTimer = undefined;
+    try {
+      if (catchControlPointerId !== null && catchGame.hasPointerCapture?.(catchControlPointerId)) {
+        catchGame.releasePointerCapture(catchControlPointerId);
+      }
+    } catch {}
+    catchControlPointerId = null;
     clearCatchItems();
-    return;
+    syncRuntimeIsolation();
+    return true;
   }
   stopGenshinOutsideMain();
-  isAdventureMenuOpen = false;
-  document.body.classList.remove('adventure-menu-open');
-  adventureMenu.inert = true;
-  setFeedingMode(false); setInteractionMode(false); setSingingMode(false); setRpsMode(false); setBallMode(false);
   walking = false;
   pet.classList.remove('walking');
   catchApplesCount = 0; catchStonesCount = 0; renderCatchScore();
   catchPenguin.style.left = '50%';
+  catchGameState.penguinX = .5;
   catchGameState.lastTime = performance.now();
   window.clearInterval(catchSpawnTimer);
   catchSpawnTimer = window.setInterval(spawnCatchItem, 650);
   spawnCatchItem();
   catchAnimationFrame = window.requestAnimationFrame(catchGameFrame);
+  syncRuntimeIsolation();
+  focusRuntimeControl(closeCatchGameButton);
+  return true;
 }
 
-function setAdventureMenu(enabled) {
+function setAdventureMenu(enabled, options = {}) {
+  if (enabled === isAdventureMenuOpen) return true;
   if (enabled && affectionRequired()) return;
   if (enabled && (isSettingsOpen() || isDead || isRpsResolving)) return;
+  if (enabled && !options.coordinated && !closeCompetingModes('adventure')) return false;
   isAdventureMenuOpen = enabled;
   document.body.classList.toggle('adventure-menu-open', enabled);
   adventureMenu.inert = !enabled;
   adventureMenu.setAttribute('aria-hidden', String(!enabled));
   if (enabled) {
     stopGenshinOutsideMain();
-    setFeedingMode(false); setInteractionMode(false); setSingingMode(false); setRpsMode(false); setBallMode(false);
     walking = false;
     pet.classList.remove('walking');
   }
+  syncRuntimeIsolation();
+  if (enabled) focusRuntimeControl(closeAdventureMenuButton);
+  else if (!options.coordinated) focusRuntimeControl(adventureButton);
+  return true;
 }
 
 function clearMiningTimers() {
   window.clearTimeout(miningPickTimer); window.clearTimeout(miningResultTimer); window.clearTimeout(miningHoldTimer); window.clearTimeout(miningExitTimer); window.clearInterval(miningRollInterval);
+  miningActionTimers.forEach((timer) => window.clearTimeout(timer));
+  miningActionTimers.clear();
   miningPickTimer = miningResultTimer = miningHoldTimer = miningExitTimer = miningRollInterval = undefined;
+  try {
+    if (miningPointerId !== null && miningField.hasPointerCapture?.(miningPointerId)) {
+      miningField.releasePointerCapture(miningPointerId);
+    }
+  } catch {}
+  miningPointerId = null;
+  miningTargetRock = null;
   miningPickRoll.classList.remove('is-visible', 'is-finished');
 }
 
@@ -1517,23 +1801,24 @@ function chooseMiningPick() {
   }, 1600);
 }
 
-function setMiningMode(enabled) {
+function setMiningMode(enabled, options = {}) {
+  if (enabled === isMiningMode) return true;
   if (enabled && affectionRequired()) return;
   if (enabled && (isSettingsOpen() || isDead || isRpsResolving)) return;
+  if (enabled && !options.coordinated && !closeCompetingModes('mining')) return false;
   isMiningMode = enabled;
   document.body.classList.toggle('mining-mode', enabled);
   miningGame.inert = !enabled;
   miningGame.setAttribute('aria-hidden', String(!enabled));
   clearMiningTimers();
   if (!enabled) {
-    if (miningRunHadAttempt) applyAffectionGain(miningRunFoundStone ? 3 : 1, 'mining');
+    if (miningRunHadAttempt && options.awardRun !== false) applyAffectionGain(miningRunFoundStone ? 3 : 1, 'mining');
     miningRunHadAttempt = false;
     miningRunFoundStone = false;
-    return;
+    syncRuntimeIsolation();
+    return true;
   }
   stopGenshinOutsideMain();
-  isAdventureMenuOpen = false; document.body.classList.remove('adventure-menu-open'); adventureMenu.inert = true;
-  setFeedingMode(false); setInteractionMode(false); setSingingMode(false); setRpsMode(false); setBallMode(false); setCatchMode(false);
   walking = false; pet.classList.remove('walking');
   miningPenguin.style.left = '13%'; miningPenguin.style.top = '72%';
   miningRunHadAttempt = false;
@@ -1542,9 +1827,14 @@ function setMiningMode(enabled) {
   if (miningIsTired()) {
     miningPickStatus.textContent = '飽食度不足';
     showMiningTiredAndExit();
-    return;
+    syncRuntimeIsolation();
+    focusRuntimeControl(closeMiningGameButton);
+    return true;
   }
   chooseMiningPick();
+  syncRuntimeIsolation();
+  focusRuntimeControl(closeMiningGameButton);
+  return true;
 }
 
 function moveMiningPenguin(clientX, clientY) {
@@ -1560,12 +1850,13 @@ function moveMiningPenguin(clientX, clientY) {
 }
 
 function mineRock(rock) {
-  if (!isMiningMode || !miningPick) return;
+  if (!isMiningMode || !miningPick || rock.classList.contains('is-breaking')) return;
   if (miningIsTired()) { showMiningTiredAndExit(); return; }
   rock.classList.add('is-breaking');
   miningRunHadAttempt = true;
   const gotStone = Math.random() < miningPick.chance;
-  window.setTimeout(() => {
+  const actionTimer = window.setTimeout(() => {
+    miningActionTimers.delete(actionTimer);
     if (!isMiningMode) return;
     rock.classList.remove('is-breaking');
     if (gotStone) {
@@ -1576,6 +1867,7 @@ function mineRock(rock) {
       if (miningIsTired()) showMiningTiredAndExit(950);
     } else showMiningResult('鎬子太爛\n挖到滾木了', 'is-fail');
   }, 430);
+  miningActionTimers.add(actionTimer);
 }
 
 catchGame.addEventListener('pointerdown', (event) => {
@@ -1652,9 +1944,11 @@ function resetHideGameBoard() {
   hideGameResult.classList.remove('is-visible', 'is-lost');
 }
 
-function setHideAndSeekMode(enabled) {
+function setHideAndSeekMode(enabled, options = {}) {
+  if (enabled === isHideAndSeekMode) return true;
   if (enabled && affectionRequired(30)) return;
   if (enabled && (isSettingsOpen() || isDead || isRpsResolving)) return;
+  if (enabled && !options.coordinated && !closeCompetingModes('hide')) return false;
   isHideAndSeekMode = enabled;
   document.body.classList.toggle('hide-and-seek-mode', enabled);
   if (enabled) hideAndSeekGame.removeAttribute('inert');
@@ -1662,17 +1956,18 @@ function setHideAndSeekMode(enabled) {
   hideAndSeekGame.setAttribute('aria-hidden', String(!enabled));
   if (!enabled) {
     resetHideGameBoard();
-    return;
+    syncRuntimeIsolation();
+    if (!options.coordinated) focusRuntimeControl(interactButton);
+    return true;
   }
   stopGenshinOutsideMain();
-  setInteractionMode(false);
-  setFeedingMode(false);
-  setSingingMode(false);
-  setRpsMode(false);
   walking = false;
   pet.classList.remove('walking');
   unlockGameSounds();
   resetHideGameBoard();
+  syncRuntimeIsolation();
+  focusRuntimeControl(startHideGameButton);
+  return true;
 }
 
 function beginHideAndSeekRound() {
@@ -1736,6 +2031,7 @@ function finishHideAndSeekRound(userWon) {
   if (userWon) playSound(screamSound);
   else playSound(penguinWinSound);
   applyAffectionGain(userWon ? 3 : 1, 'hide-and-seek');
+  if (!isHideAndSeekMode || songInvitation.open || runtimeSuspended) return;
   hideGameIntro.hidden = true;
   hideGameNextRoundTimer = window.setTimeout(() => {
     if (isHideAndSeekMode && !isDead) beginHideAndSeekRound();
@@ -1894,7 +2190,6 @@ function collectFood() {
   const foodType = activeFood.dataset.foodType;
   if ((foodInventory[foodType] ?? 0) <= 0) return false;
   foodInventory[foodType] -= 1;
-  saveFoodInventory();
   updateFoodPicker();
   foodCollectedDuringJump = feedingJumpActive;
   hunger = Math.min(MAX_HUNGER, hunger + (isStone ? STONE_HUNGER_GAIN : FEED_HUNGER_GAIN));
@@ -1903,6 +2198,7 @@ function collectFood() {
   removeActiveFood();
   resetMoralSoundSequence(true);
   pet.classList.remove('feeding-chasing', 'feeding-running-away', 'walking');
+  saveFoodInventory();
   return true;
 }
 
@@ -1972,8 +2268,8 @@ function startFeedingJump() {
   feedingJumpActive = true;
   foodCollectedDuringJump = false;
   jump();
-  window.setTimeout(tryCollectFood, 300);
-  window.setTimeout(() => {
+  scheduleFeedingAction(tryCollectFood, 300);
+  scheduleFeedingAction(() => {
     feedingJumpActive = false;
     if (!isFeedingMode || !activeFood || foodCollectedDuringJump || Date.now() < activeFoodEdibleAt) return;
     if (moralSoundPlaying) return;
@@ -1990,6 +2286,14 @@ function startFeedingJump() {
       missedFeedingJumps = 0;
     });
   }, 640);
+}
+
+function scheduleFeedingAction(callback, delay) {
+  const timer = window.setTimeout(() => {
+    feedingActionTimers.delete(timer);
+    callback();
+  }, delay);
+  feedingActionTimers.add(timer);
 }
 
 function runAwayFromFood() {
@@ -2059,7 +2363,7 @@ function stopFeedingBehaviorLoop() {
 }
 
 function movePenguin() {
-  if (isFeedingMode || isSingingMode || isRpsMode || isRpsResolving || isSettingsOpen() || isDead || isDragging || isFalling || pet.classList.contains('jumping') || pet.classList.contains('crazy-flying')) return;
+  if (getActiveRuntimeMode() !== 'main' || songInvitation.open || isRpsResolving || isDead || isDragging || isFalling || pet.classList.contains('jumping') || pet.classList.contains('crazy-flying')) return;
   const maxPosition = Math.max(8, ((window.innerWidth - pet.offsetWidth) / window.innerWidth) * 100);
   const next = Math.round(4 + Math.random() * Math.max(0, maxPosition - 8));
   pet.classList.toggle('facing-left', next < position);
@@ -2068,7 +2372,12 @@ function movePenguin() {
   pet.classList.add('walking');
   pet.style.left = `${position}%`;
   maybePlayGenshinSound(getMinuteCloudCount());
-  window.setTimeout(() => { walking = false; pet.classList.remove('walking'); }, 1250);
+  window.clearTimeout(walkAnimationTimer);
+  walkAnimationTimer = window.setTimeout(() => {
+    walkAnimationTimer = undefined;
+    walking = false;
+    pet.classList.remove('walking');
+  }, 1250);
 }
 
 function scheduleWalk() {
@@ -2081,9 +2390,12 @@ function scheduleWalk() {
 }
 
 function stopScheduledWalk() {
-  if (walkTimer === undefined) return;
   window.clearTimeout(walkTimer);
+  window.clearTimeout(walkAnimationTimer);
   walkTimer = undefined;
+  walkAnimationTimer = undefined;
+  walking = false;
+  pet.classList.remove('walking');
 }
 
 function jump() {
@@ -2156,7 +2468,9 @@ function loadSoundBuffer(sound) {
   if (!AudioContextClass) return Promise.resolve(null);
   ensureAudioGraph();
   if (!sound.bufferPromise) {
-    sound.bufferPromise = fetch(sound.element.src, { cache: 'force-cache' })
+    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    const timeout = window.setTimeout(() => controller?.abort(), 15_000);
+    sound.bufferPromise = fetch(sound.element.src, { cache: 'force-cache', signal: controller?.signal })
       .then((response) => {
         if (!response.ok) throw new Error(`Audio request failed: ${response.status}`);
         return response.arrayBuffer();
@@ -2166,41 +2480,67 @@ function loadSoundBuffer(sound) {
         sound.buffer = buffer;
         return buffer;
       })
-      .catch(() => null);
+      .catch(() => null)
+      .finally(() => {
+        window.clearTimeout(timeout);
+        if (!sound.buffer) sound.bufferPromise = null;
+      });
   }
   return sound.bufferPromise;
 }
 
-function startSoundBuffer(sound, onEnded) {
+function startSoundBuffer(sound, onEnded, generation = sound.playbackGeneration) {
+  if (generation !== sound.playbackGeneration || runtimeSuspended) return false;
   const source = audioContext.createBufferSource();
   const startedAt = audioContext.currentTime;
+  let completed = false;
+  let safetyTimer;
   source.buffer = sound.buffer;
   source.connect(masterGainNode);
   sound.sources.add(source);
-  source.addEventListener('ended', () => {
+  const complete = () => {
+    if (completed) return;
+    completed = true;
+    window.clearTimeout(safetyTimer);
     sound.sources.delete(source);
     if (sound === activeSingingSound && sound.sources.size === 0) stopSingingWaveAnimation();
-    onEnded?.();
-  }, { once: true });
+    if (generation === sound.playbackGeneration) onEnded?.();
+  };
+  source.addEventListener('ended', complete, { once: true });
   source.start();
+  safetyTimer = window.setTimeout(complete, Math.max(3000, (sound.buffer.duration + 2) * 1000));
   if (sound === activeSingingSound) {
     startSingingWaveAnimation(() => audioContext.currentTime - startedAt);
   }
+  return true;
 }
 
-function playSoundBuffer(sound, onEnded) {
+function playSoundBuffer(sound, onEnded, generation = sound.playbackGeneration) {
   if (!audioContext || !sound.buffer) return false;
   if (audioContext.state !== 'running') {
     audioContext.resume()
       .then(() => {
+        if (generation !== sound.playbackGeneration || runtimeSuspended) {
+          if (runtimeSuspended && audioContext.state === 'running') audioContext.suspend().catch(() => {});
+          return;
+        }
         if (singingSounds.has(sound) && !isSingingMode) return;
-        if (audioContext.state === 'running') startSoundBuffer(sound, onEnded);
-        else playSoundFallback(sound, onEnded);
+        if (audioContext.state === 'running') startSoundBuffer(sound, onEnded, generation);
+        else playSoundFallback(sound, onEnded, generation);
       })
-      .catch(() => playSoundFallback(sound, onEnded));
+      .catch(() => {
+        if (generation === sound.playbackGeneration && !runtimeSuspended) {
+          playSoundFallback(sound, onEnded, generation);
+        }
+      });
     return true;
   }
-  startSoundBuffer(sound, onEnded);
+  try {
+    startSoundBuffer(sound, onEnded, generation);
+  } catch (error) {
+    console.warn('[audio] WebAudio 播放失敗，改用媒體元素', error);
+    playSoundFallback(sound, onEnded, generation);
+  }
   return true;
 }
 
@@ -2217,43 +2557,13 @@ function primeAudioContext() {
   audioContextPrimed = true;
 }
 
-function unlockSound(sound) {
-  if (AudioContextClass) {
-    primeAudioContext();
-    loadSoundBuffer(sound);
-  }
-  if (sound.unlocked || sound.unlocking) return;
-  sound.unlocking = true;
-  sound.element.muted = true;
-  sound.element.play()
-    .then(() => {
-      sound.element.pause();
-      sound.element.currentTime = 0;
-      sound.element.muted = false;
-      sound.unlocked = true;
-    })
-    .catch(() => {
-      sound.element.muted = false;
-    })
-    .finally(() => { sound.unlocking = false; });
-}
-
 function unlockGameSounds() {
   if (gameAudioActivated) {
     if (audioContext?.state === 'suspended') audioContext.resume().catch(() => {});
     return;
   }
   gameAudioActivated = true;
-  unlockSound(hurtSound);
-  unlockSound(landingSound);
-  unlockSound(screamSound);
-  unlockSound(deathSound);
-  unlockSound(deathNoteSound);
-  unlockSound(moralSound);
-  unlockSound(genshinSound);
-  unlockSound(singingSound);
-  unlockSound(kimiNoKamisamaSound);
-  unlockSound(penguinWinSound);
+  primeAudioContext();
   if (genshinSoundPending && canPlayGenshinSound()) {
     genshinSoundPending = false;
     genshinSoundPlayed = true;
@@ -2264,41 +2574,64 @@ function unlockGameSounds() {
 }
 
 document.addEventListener('pointerdown', unlockGameSounds, { capture: true });
-document.addEventListener('touchstart', unlockGameSounds, { capture: true, passive: true });
+document.addEventListener('keydown', unlockGameSounds, { capture: true });
 
-function playSoundFallback(sound, onEnded) {
+function playSoundFallback(sound, onEnded, generation = sound.playbackGeneration) {
+  if (generation !== sound.playbackGeneration || runtimeSuspended) return;
   let completed = false;
+  let safetyTimer;
   const complete = () => {
     if (completed) return;
     completed = true;
+    window.clearTimeout(safetyTimer);
     sound.element.removeEventListener('ended', complete);
+    sound.element.removeEventListener('error', complete);
+    sound.element.removeEventListener('abort', complete);
     if (sound === activeSingingSound) stopSingingWaveAnimation();
-    onEnded?.();
+    if (generation === sound.playbackGeneration) onEnded?.();
   };
-  if (onEnded) sound.element.addEventListener('ended', complete, { once: true });
-  sound.element.muted = false;
-  sound.element.currentTime = 0;
-  sound.element.play()
-    .then(() => {
-      if (sound === activeSingingSound) startSingingWaveAnimation(() => sound.element.currentTime);
-    })
-    .catch((error) => {
-      console.warn(`[audio] 無法播放 ${sound.element.src}`, error);
-      complete();
-    });
+  if (onEnded) {
+    sound.element.addEventListener('ended', complete, { once: true });
+    sound.element.addEventListener('error', complete, { once: true });
+    sound.element.addEventListener('abort', complete, { once: true });
+    safetyTimer = window.setTimeout(complete, singingSounds.has(sound) ? 65_000 : 8000);
+  }
+  try {
+    sound.element.muted = false;
+    sound.element.currentTime = 0;
+    sound.element.play()
+      .then(() => {
+        if (generation !== sound.playbackGeneration || runtimeSuspended) {
+          sound.element.pause();
+          sound.element.currentTime = 0;
+          return;
+        }
+        if (sound === activeSingingSound) startSingingWaveAnimation(() => sound.element.currentTime);
+      })
+      .catch((error) => {
+        console.warn(`[audio] 無法播放 ${sound.element.src}`, error);
+        complete();
+      });
+  } catch (error) {
+    console.warn(`[audio] 無法啟動 ${sound.element.src}`, error);
+    complete();
+  }
 }
 
 function playSound(sound, onEnded) {
-  if (playSoundBuffer(sound, onEnded)) return;
+  const generation = ++sound.playbackGeneration;
+  if (runtimeSuspended) return;
+  if (playSoundBuffer(sound, onEnded, generation)) return;
   if (AudioContextClass) {
     loadSoundBuffer(sound).then((buffer) => {
+      if (generation !== sound.playbackGeneration || runtimeSuspended) return;
       if (singingSounds.has(sound) && !isSingingMode) return;
-      if (buffer) playSoundBuffer(sound, onEnded);
-      else playSoundFallback(sound, onEnded);
+      if (buffer) playSoundBuffer(sound, onEnded, generation);
+      else playSoundFallback(sound, onEnded, generation);
     });
     return;
   }
-  playSoundFallback(sound, onEnded);
+  playSoundFallback(sound, onEnded, generation);
 }
 
 function playHurtSound() {
@@ -2314,10 +2647,11 @@ function playDeathSound() {
 }
 
 function playScreamSound(onEnded) {
-  if (!playSoundBuffer(screamSound, onEnded)) playSoundFallback(screamSound, onEnded);
+  playSound(screamSound, onEnded);
 }
 
 function stopSound(sound) {
+  sound.playbackGeneration += 1;
   sound.sources.forEach((source) => {
     try { source.stop(); } catch {}
   });
@@ -2338,11 +2672,10 @@ function triggerDeath(cause = '企鵝失去了所有血量') {
   isDead = true;
   resetSongInvitation();
   stopGenshinOutsideMain();
-  setCatchMode(false);
-  setHideAndSeekMode(false);
-  setFeedingMode(false);
-  setSingingMode(false);
-  setRpsMode(false);
+  closeCompetingModes(null, { forceSinging: true, awardMining: false });
+  setRpsPlaybackLock(false);
+  window.cancelAnimationFrame(fallAnimationFrame);
+  fallAnimationFrame = undefined;
   isDragging = false;
   isFalling = false;
   walking = false;
@@ -2367,6 +2700,7 @@ function triggerDeath(cause = '企鵝失去了所有血量') {
       deathScreen.classList.add('is-visible');
       deathScreen.setAttribute('aria-hidden', 'false');
       deathScreen.inert = false;
+      syncRuntimeIsolation();
       restartButton.focus();
     }, DEATH_SCREEN_DELAY);
   };
@@ -2378,14 +2712,24 @@ function triggerDeath(cause = '企鵝失去了所有血量') {
 
 function restartGame() {
   resetSongInvitation();
-  setHideAndSeekMode(false);
-  setFeedingMode(false);
-  setSingingMode(false);
+  closeCompetingModes(null, { forceSinging: true, awardMining: false });
+  setRpsPlaybackLock(false);
+  setMandatoryFirstSong(false);
   isDead = false;
   isDragging = false;
   isFalling = false;
   suppressNextClick = false;
+  window.clearTimeout(clickTimer);
+  clickTimer = undefined;
   clickCount = 0;
+  lastAffectionCategory = '';
+  consecutiveAffectionActions = 0;
+  trustPromptUntil = 0;
+  penguinWinStreak = 0;
+  genshinSoundPending = false;
+  genshinSoundPlayed = false;
+  lockedCloudCount = null;
+  runtimeResumeMode = null;
   health = MAX_HEALTH;
   hunger = 6;
   affection = 0;
@@ -2410,6 +2754,7 @@ function restartGame() {
   updateFoodPicker();
   writeFoodInventory();
   saveGameState();
+  syncRuntimeIsolation();
 }
 
 function showHurtEffect(damage, cause, visualTarget = pet) {
@@ -2438,6 +2783,7 @@ function calculateFallDamage(fallDistance) {
 
 function finishFall(fallDistance) {
   if (isDead) return;
+  fallAnimationFrame = undefined;
   pet.classList.remove('falling');
   isFalling = false;
   position = (pet.getBoundingClientRect().left / window.innerWidth) * 100;
@@ -2456,16 +2802,16 @@ function fallWithGravity(startTop, targetTop, fallDistance) {
     const nextTop = Math.min(targetTop, startTop + fallenDistance);
     pet.style.top = `${nextTop}px`;
     if (nextTop < targetTop) {
-      window.requestAnimationFrame(step);
+      fallAnimationFrame = window.requestAnimationFrame(step);
       return;
     }
     finishFall(fallDistance);
   };
-  window.requestAnimationFrame(step);
+  fallAnimationFrame = window.requestAnimationFrame(step);
 }
 
 function healFromFullHunger() {
-  if (isFeedingMode || isSettingsOpen() || isDead || hunger < MAX_HUNGER || health >= MAX_HEALTH) return;
+  if (getActiveRuntimeMode() !== 'main' || songInvitation.open || isDead || hunger < MAX_HUNGER || health >= MAX_HEALTH) return;
   health = Math.min(MAX_HEALTH, health + HEAL_AMOUNT);
   hunger = Math.max(0, hunger - HEAL_HUNGER_COST);
   renderHealth();
@@ -2504,6 +2850,7 @@ function releasePenguin(event) {
   if (isDead || !isDragging) return;
 
   isDragging = false;
+  if (event.type === 'pointercancel') suppressNextClick = false;
   isFalling = true;
   pet.classList.remove('dragging');
   const startTop = pet.getBoundingClientRect().top;
@@ -2526,23 +2873,77 @@ window.addEventListener('resize', () => {
   pet.style.top = `${landingTop()}px`;
 });
 
+function startRuntimeTimers() {
+  if (runtimeSuspended) return;
+  if (dayNightTimer === undefined) dayNightTimer = window.setInterval(updateDayNightFromBrowserTime, 60_000);
+  if (healTimer === undefined) healTimer = window.setInterval(healFromFullHunger, FULL_HUNGER_HEAL_INTERVAL);
+  scheduleNextCloudUpdate();
+  scheduleWalk();
+}
+
+function stopRuntimeTimers() {
+  window.clearInterval(dayNightTimer);
+  window.clearInterval(healTimer);
+  window.clearTimeout(cloudUpdateTimer);
+  dayNightTimer = undefined;
+  healTimer = undefined;
+  cloudUpdateTimer = undefined;
+  stopFeedingBehaviorLoop();
+  stopScheduledWalk();
+}
+
+function settleInterruptedPenguinDrag() {
+  window.cancelAnimationFrame(fallAnimationFrame);
+  fallAnimationFrame = undefined;
+  if (!isDragging && !isFalling) return;
+  isDragging = false;
+  isFalling = false;
+  suppressNextClick = false;
+  pet.classList.remove('dragging', 'falling');
+  pet.style.bottom = 'auto';
+  pet.style.top = `${landingTop()}px`;
+  position = (pet.getBoundingClientRect().left / window.innerWidth) * 100;
+}
+
+function suspendRuntime() {
+  if (runtimeSuspended) return;
+  runtimeResumeMode = getActiveRuntimeMode();
+  if (runtimeResumeMode === 'catch') settleCatchRewards();
+  runtimeSuspended = true;
+  closeCompetingModes(null, { forceSinging: true, awardMining: false });
+  setRpsPlaybackLock(false);
+  stopRuntimeTimers();
+  settleInterruptedPenguinDrag();
+  gameSounds.forEach(stopSound);
+  lockedCloudCount = null;
+  genshinSoundPending = false;
+  audioContext?.suspend().catch(() => {});
+  saveGameState();
+}
+
+function resumeRuntime() {
+  if (!runtimeSuspended || document.hidden) return;
+  const mode = runtimeResumeMode;
+  runtimeResumeMode = null;
+  runtimeSuspended = false;
+  updateDayNightFromBrowserTime();
+  updateCloudsFromClock();
+  startRuntimeTimers();
+  resumeRuntimeMode(mode);
+}
+
 updateDayNightFromBrowserTime();
 updateCloudsFromClock();
-window.setInterval(updateDayNightFromBrowserTime, 60_000);
-scheduleNextCloudUpdate();
-window.setInterval(healFromFullHunger, FULL_HUNGER_HEAL_INTERVAL);
-scheduleWalk();
+if (!runtimeSuspended) startRuntimeTimers();
 
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) {
-    stopFeedingBehaviorLoop();
-    stopScheduledWalk();
-    return;
-  }
-  updateDayNightFromBrowserTime();
-  if (isFeedingMode) startFeedingBehaviorLoop();
-  scheduleWalk();
+  if (document.hidden) suspendRuntime();
+  else resumeRuntime();
 });
+window.addEventListener('blur', suspendRuntime);
+window.addEventListener('focus', resumeRuntime);
+window.addEventListener('pagehide', suspendRuntime);
+window.addEventListener('pageshow', resumeRuntime);
 
 // Game feature controls.
 function openAdventureMenu(event) {
@@ -2550,11 +2951,6 @@ function openAdventureMenu(event) {
   setAdventureMenu(true);
 }
 adventureButton.addEventListener('click', openAdventureMenu);
-// Start on press so mobile browsers do not lose the click when the menu layer opens.
-adventureButton.addEventListener('pointerdown', (event) => {
-  if (event.pointerType !== 'mouse') openAdventureMenu(event);
-});
-adventureButton.addEventListener('touchstart', openAdventureMenu, { passive: false });
 closeAdventureMenuButton.addEventListener('click', () => setAdventureMenu(false));
 adventureMenu.querySelector('[data-adventure-game="catch"]').addEventListener('click', () => setCatchMode(true));
 adventureMenu.querySelector('[data-adventure-game="mining"]').addEventListener('click', () => setMiningMode(true));
@@ -2563,10 +2959,18 @@ closeCatchGameButton.addEventListener('click', () => {
   setCatchMode(false);
   setAdventureMenu(true);
 });
-closeMiningGameButton.addEventListener('click', () => { setMiningMode(false); setAdventureMenu(true); });
+closeMiningGameButton.addEventListener('click', () => {
+  setMiningMode(false);
+  if (songInvitation.open) {
+    invitationResumeMode = 'adventure';
+    return;
+  }
+  setAdventureMenu(true);
+});
 
 miningField.addEventListener('pointerdown', (event) => {
   if (!isMiningMode || event.target.closest('.mining-toolbar')) return;
+  if (miningPointerId !== null) return;
   const rock = event.target.closest('.mining-rock');
   if (!rock) { moveMiningPenguin(event.clientX, event.clientY); return; }
   event.preventDefault();
@@ -2618,18 +3022,13 @@ function openBallGame(event) {
   setBallMode(true);
 }
 ballButton.addEventListener('click', openBallGame);
-// Start on press: mobile Safari may lose the release event when the menu closes.
-ballButton.addEventListener('pointerdown', (event) => {
-  if (event.pointerType !== 'mouse') openBallGame(event);
-});
-ballButton.addEventListener('touchstart', openBallGame, { passive: false });
 closeBallGameButton.addEventListener('click', () => setBallMode(false));
 closeHideGameButton.addEventListener('click', () => setHideAndSeekMode(false));
 startHideGameButton.addEventListener('click', beginHideAndSeekRound);
 hidePenguin.addEventListener('click', () => finishHideAndSeekRound(true));
 hidePenguinHit.addEventListener('click', () => finishHideAndSeekRound(true));
 endRpsButton.addEventListener('click', () => {
-  if (!isRpsResolving) setRpsMode(false);
+  setRpsMode(false);
 });
 rpsChoiceButtons.forEach((button) => {
   button.addEventListener('click', () => playRpsRound(button.dataset.rpsChoice));
@@ -2659,6 +3058,7 @@ backSongInvitationButton.addEventListener('click', () => {
 confirmDeclineSongInvitationButton.addEventListener('click', () => {
   writeSongInvitationState('declined');
   songInvitation.close();
+  resumeAfterSongInvitation();
 });
 
 foodPicker.querySelectorAll('[data-food-type]').forEach((button) => {

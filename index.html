@@ -37,7 +37,7 @@
         </div>
         <section class="save-setting" aria-label="存檔碼">
           <label for="save-code">存檔</label>
-          <textarea id="save-code" rows="3" spellcheck="false" autocapitalize="off" autocorrect="off" placeholder="在這裡貼上存檔碼"></textarea>
+          <textarea id="save-code" rows="3" maxlength="128" spellcheck="false" autocapitalize="off" autocorrect="off" placeholder="在這裡貼上存檔碼"></textarea>
           <div class="save-actions">
             <button id="copy-save-code" type="button">生成存檔碼</button>
             <button id="import-save-code" type="button">匯入存檔碼</button>
@@ -141,7 +141,7 @@
           </div>
         </div>
       </section>
-      <section id="adventure-menu" class="adventure-menu" aria-label="探險模式選單" aria-hidden="true" inert>
+      <section id="adventure-menu" class="adventure-menu" role="dialog" aria-modal="true" aria-label="探險模式選單" aria-hidden="true" inert>
         <div class="adventure-menu-header">
           <h1>探險模式</h1>
           <button id="close-adventure-menu" type="button">返回</button>
@@ -155,7 +155,7 @@
           <button class="adventure-card is-locked" type="button" disabled><svg class="adventure-card-icon" viewBox="0 0 48 48" aria-hidden="true"><path d="M24 42V8M24 18C17 8 9 10 7 12c2 8 8 11 17 10M24 26c7-10 15-8 17-6-2 8-8 11-17 10M24 34C17 24 9 26 7 28c2 8 8 11 17 10M24 42c7-10 15-8 17-6-2 8-8 11-17 10"/></svg><span>神秘地圖</span><small>敬請期待</small></button>
         </div>
       </section>
-      <section id="catch-game" class="catch-game" aria-label="接接樂" aria-hidden="true" inert>
+      <section id="catch-game" class="catch-game" role="dialog" aria-modal="true" aria-label="接接樂" aria-hidden="true" inert>
         <div class="catch-sky" aria-hidden="true"></div>
         <div class="catch-ground" aria-hidden="true"></div>
         <div class="catch-hud" aria-live="polite">
@@ -167,7 +167,7 @@
         <button id="catch-penguin" class="catch-penguin" type="button" aria-label="企鵝，左右移動以接住物品"><img src="image/gugugaga-white.png" alt="企鵝" draggable="false" /></button>
         <p class="catch-help">在場景中左右移動，企鵝會跟隨手指或滑鼠</p>
       </section>
-      <section id="mining-game" class="mining-game" aria-label="挖礦" aria-hidden="true" inert>
+      <section id="mining-game" class="mining-game" role="dialog" aria-modal="true" aria-label="挖礦" aria-hidden="true" inert>
         <div class="mining-toolbar"><span id="mining-pick-status" class="mining-pick-status" aria-live="polite">正在抽選鎬子…</span><button id="close-mining-game" type="button">結束</button></div>
         <div id="mining-field" class="mining-field" aria-label="礦坑：輕點移動，長按石頭挖掘">
           <div id="mining-rocks" class="mining-rocks"></div>
@@ -182,7 +182,7 @@
         </div>
       </section>
       <p id="rps-result" class="rps-result" aria-live="polite" aria-hidden="true">選一個出拳吧</p>
-      <section id="ball-game" class="ball-game" aria-label="和企鵝玩球" aria-hidden="true" inert>
+      <section id="ball-game" class="ball-game" role="dialog" aria-modal="true" aria-label="和企鵝玩球" aria-hidden="true" inert>
         <div class="ball-combo" aria-live="polite">連擊數 <strong id="ball-combo-value">0</strong></div>
         <div class="ball-game-bar">
           <button id="close-ball-game" type="button" aria-label="結束玩球">結束</button>
@@ -191,7 +191,7 @@
         <canvas id="ball-court" aria-label="玩球場地：移動球拍接住球"></canvas>
         <p class="ball-game-hint">滑鼠或手指左右移動球拍</p>
       </section>
-      <section id="hide-and-seek-game" class="hide-and-seek-game" aria-label="和企鵝玩捉迷藏" aria-hidden="true" inert>
+      <section id="hide-and-seek-game" class="hide-and-seek-game" role="dialog" aria-modal="true" aria-label="和企鵝玩捉迷藏" aria-hidden="true" inert>
         <div class="hide-game-toolbar">
           <span id="hide-game-timer" class="hide-game-timer" aria-live="polite">找到企鵝！</span>
           <button id="close-hide-game" type="button" aria-label="結束捉迷藏">結束</button>
