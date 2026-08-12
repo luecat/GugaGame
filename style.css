@@ -3,6 +3,7 @@ html { color-scheme: only light; }
 body { margin: 0; overflow: hidden; overscroll-behavior: none; background: #8ed7f4; font-family: sans-serif; transition: background .8s ease; }
 .world { position: relative; width: 100vw; height: 100vh; height: 100dvh; overflow: hidden; }
 .settings-button { position: absolute; z-index: 12; top: 18px; left: 18px; display: grid; place-items: center; width: 46px; height: 46px; padding: 10px; border: 0; border-radius: 50%; background: #ffffffc9; color: #38515b; cursor: pointer; transition: background .2s ease, transform .2s ease; }
+.settings-button[hidden] { display: none; }
 .settings-button:hover { background: #ffffffe8; }
 .settings-button:active { transform: scale(.94); }
 .settings-button:focus-visible { outline: 3px solid #38515b; outline-offset: 3px; }
