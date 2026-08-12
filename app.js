@@ -480,9 +480,9 @@ function setMandatoryFirstSong(enabled) {
   isMandatoryFirstSong = enabled;
   cancelSingingButton.disabled = enabled;
   singingSongButton.disabled = enabled;
-  settingsButton.disabled = enabled;
   if (!enabled) kimiNoKamisamaSongButton.disabled = false;
   document.body.classList.toggle('mandatory-first-song', enabled);
+  syncRuntimeIsolation();
 }
 
 function ensureAudioGraph() {
@@ -632,8 +632,12 @@ function syncRuntimeIsolation() {
   const activeOverlay = [...overlayStates].find(([, active]) => active)?.[0] ?? null;
   const activeMode = getActiveRuntimeMode();
   const limitedMode = ['settings', 'feeding', 'interaction', 'singing', 'rps'].includes(activeMode);
+  const settingsAvailable = !isDead && !isMandatoryFirstSong && !songInvitation.open;
+  settingsButton.hidden = !settingsAvailable;
+  settingsButton.disabled = !settingsAvailable;
   [...world.children].forEach((child) => {
-    if (activeOverlay) child.inert = child !== activeOverlay;
+    if (child === settingsButton) child.inert = !settingsAvailable;
+    else if (activeOverlay) child.inert = child !== activeOverlay;
     else if (activeMode === 'settings') child.inert = child !== settingsButton && child !== settingsMenu;
     else if (limitedMode) {
       const isModeControl = child === featurePanel
@@ -904,6 +908,7 @@ function maybeShowSongInvitation() {
   showSongInvitationChoice();
   try {
     songInvitation.showModal();
+    syncRuntimeIsolation();
   } catch (error) {
     console.warn('[invitation] 無法開啟歌曲邀請', error);
     resumeAfterSongInvitation();
@@ -2670,6 +2675,7 @@ function triggerDeath(cause = '企鵝失去了所有血量') {
     return;
   }
   isDead = true;
+  syncRuntimeIsolation();
   resetSongInvitation();
   stopGenshinOutsideMain();
   closeCompetingModes(null, { forceSinging: true, awardMining: false });
@@ -3041,6 +3047,7 @@ cancelSingingButton.addEventListener('click', () => {
 singingSongButton.addEventListener('click', () => playSingingSong(singingSound));
 kimiNoKamisamaSongButton.addEventListener('click', playKimiNoKamisamaSong);
 songInvitation.addEventListener('cancel', (event) => event.preventDefault());
+songInvitation.addEventListener('close', syncRuntimeIsolation);
 acceptSongInvitationButton.addEventListener('click', () => {
   writeSongInvitationState('unlocked-new');
   setMandatoryFirstSong(true);
