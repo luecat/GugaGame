@@ -138,6 +138,9 @@ body.interaction-mode #interact-button { background: #b45b5b; }
 .singing-picker { display: none; grid-template-columns: minmax(0, 1fr); width: 100%; gap: 7px; }
 .singing-picker button { width: 100%; min-height: 0; padding: 7px 9px; background: #52747f; }
 .singing-picker #cancel-singing-button { background: #b45b5b; }
+.singing-picker button[hidden] { display: none; }
+.singing-picker button:disabled { opacity: .42; cursor: not-allowed; }
+.singing-picker .is-first-unlock { position: relative; z-index: 1; background: #d59a25; color: #111; animation: song-first-unlock 1.05s ease-in-out infinite alternate; }
 body.singing-mode .feature-actions, body.singing-mode .food-picker, body.singing-mode .interaction-picker { display: none; }
 body.singing-mode .singing-picker { display: grid; }
 body.singing-mode .pet { display: block; visibility: visible; opacity: 1; }
@@ -237,6 +240,18 @@ body.rps-resolving .world { pointer-events: none; }
 .pet.rps-penguin-win { animation: rps-victory-shake .92s cubic-bezier(.22,.8,.32,1) both; }
 body.singing-song-playing .pet { transition: none; }
 body.singing-song-playing .pet img { transform: translateY(var(--singing-lift, 0)) rotate(var(--singing-tilt, 0deg)) scale(var(--singing-scale, 1)); transition: transform 50ms linear; }
+.song-invitation { width: min(430px, calc(100vw - 32px)); padding: 0; border: 0; border-radius: 16px; background: transparent; color: #263f4a; }
+.song-invitation::backdrop { background: #172631a8; backdrop-filter: blur(3px); }
+.song-invitation-card { padding: clamp(22px, 5vw, 34px); border: 2px solid #ffffff; border-radius: 16px; background: #fff9e9; box-shadow: 0 18px 50px #101c2559; text-align: center; }
+.song-invitation h1 { margin: 0; font-size: clamp(22px, 5vw, 30px); line-height: 1.25; }
+.song-invitation p { margin: 14px 0 0; font-weight: 750; line-height: 1.6; }
+.song-invitation-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; margin-top: 22px; }
+.song-invitation button { min-height: 44px; padding: 9px 12px; border: 0; border-radius: 9px; background: #d8d3c8; color: #263f4a; font: inherit; font-weight: 900; cursor: pointer; }
+.song-invitation button.is-primary { background: #52747f; color: #fff; }
+.song-invitation button.is-danger { background: #a54e4e; color: #fff; }
+.song-invitation-confirmation[hidden], .song-invitation-actions[hidden] { display: none; }
+.song-invitation-confirmation > p { color: #8d3434; }
+@keyframes song-first-unlock { from { box-shadow: 0 0 0 2px #fff, 0 0 0 5px #e1a42d66; transform: scale(1); } to { box-shadow: 0 0 0 3px #fff, 0 0 0 9px #e1a42d22; transform: scale(1.025); } }
 .food-picker button { flex-direction: column; min-height: 68px; background: #52747f; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .food-picker button:disabled { opacity: .42; cursor: not-allowed; }
 .food-rarity { display: inline-flex; align-items: center; gap: 2px; height: 14px; color: #f2bd4a; }
