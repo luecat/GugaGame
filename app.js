@@ -2738,10 +2738,10 @@ function triggerDeath(cause = '企鵝失去了所有血量') {
     pet.removeEventListener('animationstart', syncScreamWithJumpscare);
     if (!isDead) return;
     playScreamSound();
+    playDeathSound();
     window.setTimeout(() => {
       if (!isDead) return;
       stopSound(screamSound);
-      playDeathSound();
       deathScreen.classList.add('is-visible');
       deathScreen.setAttribute('aria-hidden', 'false');
       deathScreen.inert = false;
