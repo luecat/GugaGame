@@ -453,10 +453,10 @@ function createSound(path) {
   };
 }
 
-const hurtSound = createSound('audio/痾啊.wav');
+const hurtSound = createSound('audio/死亡音效.wav');
 const landingSound = createSound('audio/落地.wav');
 const screamSound = createSound('audio/咿.wav');
-const deathSound = createSound('audio/死亡音效.wav');
+const deathSound = createSound('audio/痾啊.wav');
 const deathNoteSound = createSound('audio/死亡筆記本.wav');
 const moralSound = createSound('audio/做事要講良心.wav');
 const genshinSound = createSound('audio/好想玩原神.wav');
