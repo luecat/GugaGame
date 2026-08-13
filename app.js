@@ -2731,7 +2731,6 @@ function triggerDeath(cause = '企鵝失去了所有血量') {
   }
   clickCount = 0;
   pet.classList.remove('walking', 'facing-left', 'jumping', 'spinning', 'crazy-flying', 'dragging', 'falling', 'hurt');
-  playDeathSound();
   world.classList.add('is-dying');
   deathCause.textContent = cause;
   const syncScreamWithJumpscare = (event) => {
@@ -2749,7 +2748,9 @@ function triggerDeath(cause = '企鵝失去了所有血量') {
   };
   pet.addEventListener('animationstart', syncScreamWithJumpscare);
   window.setTimeout(() => {
-    if (isDead) pet.classList.add('death-jumpscare');
+    if (!isDead) return;
+    pet.classList.add('death-jumpscare');
+    playDeathSound();
   }, DEATH_RED_FLASH_DELAY);
 }
 
