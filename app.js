@@ -152,11 +152,11 @@ let rpsResultResetTimer;
 let rpsRoundId = 0;
 let ballResetTimer;
 const normalPetImageSource = petImage.getAttribute('src');
-const singingPetImageSource = new URL('image/gugugaga-sing-transparent.png?v=20260813-safari1', document.baseURI).href;
+const singingPetImageSource = new URL('image/gugugaga-sing.png?v=20260803-13', document.baseURI).href;
 const RPS_PENGUIN_IMAGES = {
-  scissors: new URL('image/gugugaga-剪刀-transparent.png?v=20260813-safari1', document.baseURI).href,
-  rock: new URL('image/gugugaga-石頭-transparent.png?v=20260813-safari1', document.baseURI).href,
-  paper: new URL('image/gugugaga-布-transparent.png?v=20260813-safari1', document.baseURI).href,
+  scissors: new URL('image/gugugaga-剪刀.png', document.baseURI).href,
+  rock: new URL('image/gugugaga-石頭.png', document.baseURI).href,
+  paper: new URL('image/gugugaga-布.png', document.baseURI).href,
 };
 const RPS_HAND_NAMES = { scissors: '剪刀', rock: '石頭', paper: '布' };
 const RPS_LOSING_HAND = { scissors: 'paper', rock: 'scissors', paper: 'rock' };
@@ -590,10 +590,10 @@ const MINING_HUNGER_COST = 1;
 const MINING_MIN_HUNGER = MAX_HUNGER * .35;
 const MINING_HOLD_MS = 550;
 const MINING_PICKS = [
-  { id: 'diamond', name: '鑽石鎬', chance: 1, image: 'image/gugugaga_鑽石-transparent.png?v=20260813-safari1', pickImage: 'image/鑽石鎬.png' },
-  { id: 'iron', name: '鐵鎬', chance: .75, image: 'image/gugugaga＿鐵鎬-transparent.png?v=20260813-safari1', pickImage: 'image/鐵鎬.png' },
-  { id: 'stone', name: '石鎬', chance: .5, image: 'image/gugugaga＿石鎬-transparent.png?v=20260813-safari1', pickImage: 'image/石鎬.png' },
-  { id: 'wood', name: '木鎬', chance: .25, image: 'image/gugugaga_木鎬-transparent.png?v=20260813-safari1', pickImage: 'image/木鎬.webp' },
+  { id: 'diamond', name: '鑽石鎬', chance: 1, image: 'image/gugugaga_鑽石.png', pickImage: 'image/鑽石鎬.png' },
+  { id: 'iron', name: '鐵鎬', chance: .75, image: 'image/gugugaga＿鐵鎬.png', pickImage: 'image/鐵鎬.png' },
+  { id: 'stone', name: '石鎬', chance: .5, image: 'image/gugugaga＿石鎬.png', pickImage: 'image/石鎬.png' },
+  { id: 'wood', name: '木鎬', chance: .25, image: 'image/gugugaga_木鎬.png', pickImage: 'image/木鎬.webp' },
 ];
 const USE_IOS_TOUCH_DRAG = /iPad|iPhone|iPod/.test(navigator.userAgent)
   || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
