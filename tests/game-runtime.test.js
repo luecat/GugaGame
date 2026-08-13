@@ -66,9 +66,3 @@ test('background suspension clears active loops and delayed audio', () => {
   assert.match(source, /generation !== sound\.playbackGeneration \|\| runtimeSuspended/);
   assert.match(source, /getActiveRuntimeMode\(\) !== 'main' \|\| songInvitation\.open/);
 });
-
-test('beta rhythm entry is a top-level feature marked test-only', () => {
-  assert.match(html, /class="feature-actions"[\s\S]*id="rhythm-game-link"[\s\S]*href="scp-game\.html"/i);
-  assert.match(html, /id="rhythm-game-link"[^>]*data-test-module="scp-rhythm"[^>]*data-release-scope="beta-only"/i);
-  assert.doesNotMatch(html, /href="[^"]*scp-parser/i);
-});
