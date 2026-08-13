@@ -1,5 +1,7 @@
 html { color-scheme: only light; }
 * { box-sizing: border-box; }
+button, .feature-link { -webkit-tap-highlight-color: transparent; }
+button { -webkit-appearance: none; appearance: none; }
 body { margin: 0; overflow: hidden; overscroll-behavior: none; background: #8ed7f4; font-family: sans-serif; transition: background .8s ease; }
 .world { position: relative; width: 100vw; height: 100vh; height: 100dvh; overflow: hidden; }
 .settings-button { position: absolute; z-index: 12; top: 18px; left: 18px; display: grid; place-items: center; width: 46px; height: 46px; padding: 10px; border: 0; border-radius: 50%; background: #ffffffc9; color: #38515b; cursor: pointer; transition: background .2s ease, transform .2s ease; }
