@@ -117,6 +117,7 @@ let isRpsMode = false;
 let isRpsResolving = false;
 let isBallMode = false;
 let isAdventureMenuOpen = false;
+let adventureMenuOpenedAt = 0;
 let isCatchMode = false;
 let catchAnimationFrame;
 let catchSpawnTimer;
@@ -589,6 +590,9 @@ const STONE_GREETING_LOOK_MS = 240;
 const MINING_HUNGER_COST = 1;
 const MINING_MIN_HUNGER = MAX_HUNGER * .35;
 const MINING_HOLD_MS = 550;
+const MINING_MIN_REACH_DISTANCE = 145;
+const MINING_ROCK_COUNT = 5;
+const MINING_RESULT_DURATION_MS = 1100;
 const MINING_PICKS = [
   { id: 'diamond', name: '鑽石鎬', chance: 1, image: 'image/gugugaga_鑽石.png', pickImage: 'image/鑽石鎬.png' },
   { id: 'iron', name: '鐵鎬', chance: .75, image: 'image/gugugaga＿鐵鎬.png', pickImage: 'image/鐵鎬.png' },
@@ -671,7 +675,7 @@ function closeCompetingModes(targetMode, options = {}) {
     if (targetMode !== 'ball' && isBallMode) setBallMode(false, { coordinated: true });
     if (targetMode !== 'adventure' && isAdventureMenuOpen) setAdventureMenu(false, { coordinated: true });
     if (targetMode !== 'catch' && isCatchMode) setCatchMode(false, { coordinated: true });
-    if (targetMode !== 'mining' && isMiningMode) {
+    if (!options.preserveMining && targetMode !== 'mining' && isMiningMode) {
       setMiningMode(false, { coordinated: true, awardRun: options.awardMining !== false });
     }
     if (targetMode !== 'hide' && isHideAndSeekMode) setHideAndSeekMode(false, { coordinated: true });
@@ -1709,6 +1713,7 @@ function setAdventureMenu(enabled, options = {}) {
   if (enabled && (isSettingsOpen() || isDead || isRpsResolving)) return;
   if (enabled && !options.coordinated && !closeCompetingModes('adventure')) return false;
   isAdventureMenuOpen = enabled;
+  if (enabled) adventureMenuOpenedAt = performance.now();
   document.body.classList.toggle('adventure-menu-open', enabled);
   adventureMenu.inert = !enabled;
   adventureMenu.setAttribute('aria-hidden', String(!enabled));
@@ -1740,6 +1745,16 @@ function clearMiningTimers() {
 
 function miningIsTired() { return hunger < MINING_MIN_HUNGER; }
 
+function positionMiningResult() {
+  const fieldRect = miningField.getBoundingClientRect();
+  const penguinRect = miningPenguin.getBoundingClientRect();
+  if (!fieldRect.width || !fieldRect.height || !penguinRect.width || !penguinRect.height) return;
+  const x = penguinRect.left + penguinRect.width / 2 - fieldRect.left;
+  const y = penguinRect.top - fieldRect.top;
+  miningResult.style.left = `${Math.max(56, Math.min(fieldRect.width - 56, x))}px`;
+  miningResult.style.top = `${Math.max(64, y)}px`;
+}
+
 function showMiningResult(message, type = '') {
   window.clearTimeout(miningResultTimer);
   miningResult.replaceChildren(...message.split('\n').map((line) => {
@@ -1748,8 +1763,9 @@ function showMiningResult(message, type = '') {
     resultLine.textContent = line;
     return resultLine;
   }));
+  positionMiningResult();
   miningResult.className = `mining-result is-visible ${type}`;
-  miningResultTimer = window.setTimeout(() => { miningResult.className = 'mining-result'; }, 1800);
+  miningResultTimer = window.setTimeout(() => { miningResult.className = 'mining-result'; }, MINING_RESULT_DURATION_MS);
 }
 
 function showMiningTiredAndExit(delay = 0) {
@@ -1759,12 +1775,22 @@ function showMiningTiredAndExit(delay = 0) {
     miningExitTimer = window.setTimeout(() => {
       miningExitTimer = undefined;
       setMiningMode(false);
+      if (!songInvitation.open) setAdventureMenu(true);
     }, 1500);
   }, delay);
 }
 
 function renderMiningRocks() {
-  const spots = [[19, 71, 74], [38, 47, 88], [61, 68, 76], [79, 40, 92], [88, 76, 67]];
+  const spots = [];
+  while (spots.length < MINING_ROCK_COUNT) {
+    const size = 66 + Math.floor(Math.random() * 27);
+    const x = 12 + Math.random() * 76;
+    const y = 27 + Math.random() * 57;
+    const separateEnough = spots.every(([otherX, otherY, otherSize]) => (
+      Math.hypot((x - otherX) * 1.18, y - otherY) > (size + otherSize) / 5
+    ));
+    if (separateEnough) spots.push([x, y, size]);
+  }
   miningRocks.replaceChildren(...spots.map(([x, y, size], index) => {
     const rock = document.createElement('button');
     rock.type = 'button'; rock.className = 'mining-rock'; rock.dataset.rock = String(index);
@@ -1854,9 +1880,21 @@ function moveMiningPenguin(clientX, clientY) {
   miningPenguin.style.left = `${x}%`; miningPenguin.style.top = `${y}%`;
 }
 
+function miningRockIsInReach(rock) {
+  const penguinRect = miningPenguin.getBoundingClientRect();
+  const rockRect = rock.getBoundingClientRect();
+  const penguinX = penguinRect.left + penguinRect.width / 2;
+  const penguinY = penguinRect.top + penguinRect.height / 2;
+  const rockX = rockRect.left + rockRect.width / 2;
+  const rockY = rockRect.top + rockRect.height / 2;
+  const reach = Math.max(MINING_MIN_REACH_DISTANCE, (penguinRect.width + rockRect.width) * .9);
+  return Math.hypot(penguinX - rockX, penguinY - rockY) <= reach;
+}
+
 function mineRock(rock) {
   if (!isMiningMode || !miningPick || rock.classList.contains('is-breaking')) return;
   if (miningIsTired()) { showMiningTiredAndExit(); return; }
+  if (!miningRockIsInReach(rock)) { showMiningResult('太遠了\n走近一點吧', 'is-fail'); return; }
   rock.classList.add('is-breaking');
   miningRunHadAttempt = true;
   const gotStone = Math.random() < miningPick.chance;
@@ -1865,6 +1903,7 @@ function mineRock(rock) {
     if (!isMiningMode) return;
     rock.classList.remove('is-breaking');
     if (gotStone) {
+      rock.remove();
       miningRunFoundStone = true;
       foodInventory.stone = Math.min(FOOD_MAX_QUANTITY, foodInventory.stone + 1); saveFoodInventory(); updateFoodPicker();
       hunger = Math.max(0, hunger - MINING_HUNGER_COST); renderHunger(); saveGameState();
@@ -2678,7 +2717,7 @@ function triggerDeath(cause = '企鵝失去了所有血量') {
   syncRuntimeIsolation();
   resetSongInvitation();
   stopGenshinOutsideMain();
-  closeCompetingModes(null, { forceSinging: true, awardMining: false });
+  closeCompetingModes(null, { forceSinging: true, awardMining: false, preserveMining: runtimeResumeMode === 'mining' });
   setRpsPlaybackLock(false);
   window.cancelAnimationFrame(fallAnimationFrame);
   fallAnimationFrame = undefined;
@@ -2946,8 +2985,6 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) suspendRuntime();
   else resumeRuntime();
 });
-window.addEventListener('blur', suspendRuntime);
-window.addEventListener('focus', resumeRuntime);
 window.addEventListener('pagehide', suspendRuntime);
 window.addEventListener('pageshow', resumeRuntime);
 
@@ -2959,7 +2996,10 @@ function openAdventureMenu(event) {
 adventureButton.addEventListener('click', openAdventureMenu);
 closeAdventureMenuButton.addEventListener('click', () => setAdventureMenu(false));
 adventureMenu.querySelector('[data-adventure-game="catch"]').addEventListener('click', () => setCatchMode(true));
-adventureMenu.querySelector('[data-adventure-game="mining"]').addEventListener('click', () => setMiningMode(true));
+adventureMenu.querySelector('[data-adventure-game="mining"]').addEventListener('click', () => {
+  if (performance.now() - adventureMenuOpenedAt < 300) return;
+  setMiningMode(true);
+});
 closeCatchGameButton.addEventListener('click', () => {
   settleCatchRewards();
   setCatchMode(false);
