@@ -7,7 +7,7 @@
     <meta name="color-scheme" content="dark only" />
     <meta name="theme-color" content="#101827" />
     <title>GugaGame SCP 音遊</title>
-    <link rel="stylesheet" href="scp-game.css?v=20260813-2" />
+    <link rel="stylesheet" href="scp-game.css?v=20260813-3" />
   </head>
   <body>
     <main id="game-shell" class="game-shell">
@@ -56,8 +56,8 @@
             <label for="lane-width-slider">軌道寬度 <output id="lane-width-output" for="lane-width-slider">100%</output>
               <input id="lane-width-slider" type="range" min="55" max="130" step="1" value="100" />
             </label>
-            <label for="judgment-line-slider">判定線高度 <output id="judgment-line-output" for="judgment-line-slider">86%</output>
-              <input id="judgment-line-slider" type="range" min="68" max="90" step="1" value="86" />
+            <label for="judgment-line-slider">判定線高度 <output id="judgment-line-output" for="judgment-line-slider">78%</output>
+              <input id="judgment-line-slider" type="range" min="68" max="90" step="1" value="78" />
             </label>
             <label for="volume-slider">音量 <output id="volume-output" for="volume-slider">100%</output>
               <input id="volume-slider" type="range" min="0" max="100" step="1" value="100" />
@@ -71,6 +71,7 @@
               <small>正值讓 note 較早抵達判定線，不改變判定。</small>
             </label>
           </div>
+          <p class="setting-help">判定採 60 fps 幀規格：一般鍵 PERFECT ±41.7 ms、GREAT ±83.3 ms、GOOD ±108.3 ms、BAD ±125 ms；Flick、黃鍵與 Hold 依各自類型套用專屬範圍。觸控橫向判地另比音符圖面向外放寬。</p>
         </section>
 
         <label class="file-button">
@@ -95,7 +96,7 @@
       <section id="game-hud" class="game-hud" aria-label="遊戲狀態" hidden>
         <div><span>SCORE</span><strong id="score-value">0000000</strong></div>
         <div class="combo"><span>COMBO</span><strong id="combo-value">0</strong></div>
-        <div><span>LIFE</span><strong id="life-value">100</strong></div>
+        <div class="life"><span>LIFE</span><strong id="life-value">1000</strong></div>
       </section>
       <div id="judgment" class="judgment" aria-live="off"></div>
       <div id="ready-message" class="ready-message" aria-hidden="true">READY</div>
@@ -117,6 +118,7 @@
           <div><dt>Perfect</dt><dd id="result-perfect">0</dd></div>
           <div><dt>Great</dt><dd id="result-great">0</dd></div>
           <div><dt>Good</dt><dd id="result-good">0</dd></div>
+          <div><dt>Bad</dt><dd id="result-bad">0</dd></div>
           <div><dt>Miss</dt><dd id="result-miss">0</dd></div>
         </dl>
         <div class="result-actions">
@@ -127,7 +129,7 @@
     </main>
     <script src="vendor/fflate-0.8.3.js?v=20260805-2"></script>
     <script src="scp-parser.js?v=20260805-2"></script>
-    <script src="rhythm-core.js?v=20260813-2"></script>
-    <script src="scp-game.js?v=20260813-2"></script>
+    <script src="rhythm-core.js?v=20260813-3"></script>
+    <script src="scp-game.js?v=20260813-3"></script>
   </body>
 </html>

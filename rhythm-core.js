@@ -7,12 +7,61 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, () => {
   'use strict';
 
-  const JUDGMENT_WINDOWS = Object.freeze({ perfect: .055, great: .105, good: .18 });
+  const FRAME_SECONDS = 1 / 60;
+  const JUDGMENT_PROFILES = Object.freeze({
+    normal: Object.freeze({
+      perfectBefore: 2.5 * FRAME_SECONDS,
+      perfectAfter: 2.5 * FRAME_SECONDS,
+      greatBefore: 5 * FRAME_SECONDS,
+      greatAfter: 5 * FRAME_SECONDS,
+      goodBefore: 6.5 * FRAME_SECONDS,
+      goodAfter: 6.5 * FRAME_SECONDS,
+      badBefore: 7.5 * FRAME_SECONDS,
+      badAfter: 7.5 * FRAME_SECONDS,
+    }),
+    critical: Object.freeze({
+      perfectBefore: 3.3 * FRAME_SECONDS,
+      perfectAfter: 3.3 * FRAME_SECONDS,
+      greatBefore: 4.5 * FRAME_SECONDS,
+      greatAfter: 4.5 * FRAME_SECONDS,
+      goodBefore: 6.5 * FRAME_SECONDS,
+      goodAfter: 6.5 * FRAME_SECONDS,
+      badBefore: 7.5 * FRAME_SECONDS,
+      badAfter: 7.5 * FRAME_SECONDS,
+    }),
+    flick: Object.freeze({
+      perfectBefore: 2.5 * FRAME_SECONDS,
+      perfectAfter: 2.5 * FRAME_SECONDS,
+      greatBefore: 6.5 * FRAME_SECONDS,
+      greatAfter: 7.5 * FRAME_SECONDS,
+      goodBefore: 7 * FRAME_SECONDS,
+      goodAfter: 8 * FRAME_SECONDS,
+      badBefore: 7.5 * FRAME_SECONDS,
+      badAfter: 8.5 * FRAME_SECONDS,
+    }),
+    flickCritical: Object.freeze({
+      perfectBefore: 3.5 * FRAME_SECONDS,
+      perfectAfter: 3.5 * FRAME_SECONDS,
+      greatBefore: 6.5 * FRAME_SECONDS,
+      greatAfter: 7.5 * FRAME_SECONDS,
+      goodBefore: 7 * FRAME_SECONDS,
+      goodAfter: 8 * FRAME_SECONDS,
+      badBefore: 7.5 * FRAME_SECONDS,
+      badAfter: 8.5 * FRAME_SECONDS,
+    }),
+  });
+  const JUDGMENT_WINDOWS = Object.freeze({
+    perfect: JUDGMENT_PROFILES.normal.perfectAfter,
+    great: JUDGMENT_PROFILES.normal.greatAfter,
+    good: JUDGMENT_PROFILES.normal.goodAfter,
+    bad: JUDGMENT_PROFILES.normal.badAfter,
+  });
+  const SUSTAIN_WINDOW = 5 * FRAME_SECONDS;
   const DEFAULT_SETTINGS = Object.freeze({
     scrollSpeed: 7,
     laneTilt: 100,
     laneWidth: 100,
-    judgmentLine: 86,
+    judgmentLine: 78,
     inputOffsetMs: 0,
     visualOffsetMs: 0,
   });
@@ -113,15 +162,24 @@
     return Number(chartTime || 0) - Number(inputOffsetMs || 0) / 1000;
   }
 
-  function qualityForDelta(delta) {
+  function profileForNote(note) {
+    const archetype = String(note?.archetype || '');
+    const critical = archetype.startsWith('Critical');
+    if (archetype.includes('Flick')) return critical ? JUDGMENT_PROFILES.flickCritical : JUDGMENT_PROFILES.flick;
+    return critical ? JUDGMENT_PROFILES.critical : JUDGMENT_PROFILES.normal;
+  }
+
+  function qualityForDelta(delta, profile = JUDGMENT_PROFILES.normal) {
+    const side = delta < 0 ? 'Before' : 'After';
     const absolute = Math.abs(delta);
-    if (absolute <= JUDGMENT_WINDOWS.perfect) return 'perfect';
-    if (absolute <= JUDGMENT_WINDOWS.great) return 'great';
-    if (absolute <= JUDGMENT_WINDOWS.good) return 'good';
+    if (absolute <= profile[`perfect${side}`]) return 'perfect';
+    if (absolute <= profile[`great${side}`]) return 'great';
+    if (absolute <= profile[`good${side}`]) return 'good';
+    if (absolute <= profile[`bad${side}`]) return 'bad';
     return null;
   }
 
-  function laneMatches(note, lane, forgiveness = .35) {
+  function laneMatches(note, lane, forgiveness = .85) {
     if (!Number.isFinite(note?.renderLane) || !Number.isFinite(note?.renderSize) || !Number.isFinite(lane)) return false;
     return lane >= note.renderLane - note.renderSize - forgiveness
       && lane <= note.renderLane + note.renderSize + forgiveness;
@@ -162,9 +220,15 @@
       if (!['pending', 'miss'].includes(note.status) || note.inputKind !== inputKind || !laneMatches(note, lane)) return;
       if (inputKind === 'flick' && !flickDirectionMatches(note, gestureDirection)) return;
       const delta = chartTime - note.time;
-      if (Math.abs(delta) > JUDGMENT_WINDOWS.good) return;
-      if (!candidate || note.time < candidate.note.time || (note.time === candidate.note.time && note.index < candidate.note.index)) {
-        candidate = { note, delta, quality: qualityForDelta(delta) };
+      const quality = qualityForDelta(delta, profileForNote(note));
+      if (!quality) return;
+      const distance = Math.abs(delta);
+      const candidateDistance = candidate ? Math.abs(candidate.delta) : Infinity;
+      const distancesTie = Math.abs(distance - candidateDistance) < 1e-9;
+      if (!candidate || distance < candidateDistance - 1e-9
+        || (distancesTie && (note.time < candidate.note.time
+          || (note.time === candidate.note.time && note.index < candidate.note.index)))) {
+        candidate = { note, delta, quality };
       }
     });
     return candidate;
@@ -173,12 +237,11 @@
   function sustainQualityAt(noteTime, chartTime, isHeld) {
     if (!isHeld) return null;
     const delta = chartTime - noteTime;
-    if (delta < 0) return null;
-    return 'perfect';
+    return delta >= 0 && delta <= SUSTAIN_WINDOW ? 'perfect' : null;
   }
 
-  function shouldCommitMiss(noteTime, chartTime, queueGrace = .075) {
-    return chartTime - noteTime > JUDGMENT_WINDOWS.good + Math.max(0, queueGrace);
+  function shouldCommitMiss(noteTime, chartTime, queueGrace = .075, lateWindow = JUDGMENT_WINDOWS.bad) {
+    return chartTime - noteTime > Math.max(0, lateWindow) + Math.max(0, queueGrace);
   }
 
   function approachTimeForSpeed(speed) {
@@ -191,12 +254,12 @@
     const width = Math.max(1, Number(viewportWidth) || 1);
     const height = Math.max(1, Number(viewportHeight) || 1);
     const settings = sanitizeSettings(inputSettings);
-    const nearBase = Math.min(width * .94, 980);
+    const nearBase = Math.min(width * (width < 700 ? .94 : .72), 1600);
     const nearWidth = clamp(nearBase * settings.laneWidth / 100, width * .25, width * 1.24);
     const convergence = settings.laneTilt / 100;
-    const farBase = Math.min(nearBase, width * .28);
+    const farBase = Math.min(nearBase, width * .08);
     const farWidth = (nearBase - (nearBase - farBase) * convergence) * settings.laneWidth / 100;
-    const horizonY = height * (.12 + (1 - convergence) * .14);
+    const horizonY = height * (.035 + (1 - convergence) * .18);
     const judgmentY = height * settings.judgmentLine / 100;
     return { width, height, centerX: width / 2, horizonY, judgmentY, nearWidth, farWidth };
   }
@@ -248,6 +311,8 @@
 
   return Object.freeze({
     JUDGMENT_WINDOWS,
+    JUDGMENT_PROFILES,
+    SUSTAIN_WINDOW,
     DEFAULT_SETTINGS,
     SETTING_RULES,
     clamp,
@@ -259,6 +324,7 @@
     visualChartTime,
     judgmentChartTime,
     qualityForDelta,
+    profileForNote,
     laneMatches,
     flickDirectionMatches,
     analyzeFlickGesture,

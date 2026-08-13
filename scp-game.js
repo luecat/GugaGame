@@ -54,12 +54,13 @@ const FLICK_DISTANCE_PX = 24;
 const FLICK_WINDOW_MS = 180;
 const FLICK_MIN_VELOCITY = 180;
 const CALIBRATION_ROUNDS = 8;
-const SETTINGS_STORAGE_KEY = 'gugagame-rhythm-settings-v1';
+const SETTINGS_STORAGE_KEY = 'gugagame-rhythm-settings-v2';
+const RHYTHM_VOLUME_STORAGE_KEY = 'gugagame-rhythm-volume-v1';
 const AudioContextClass = window.AudioContext || window.webkitAudioContext;
 
 function loadVolumeSetting() {
   try {
-    const stored = localStorage.getItem('gugagame-web-volume');
+    const stored = localStorage.getItem(RHYTHM_VOLUME_STORAGE_KEY);
     const value = stored === null ? 1 : Number(stored);
     return Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 1;
   } catch {
@@ -73,6 +74,7 @@ class ChartAudioPlayer {
   constructor() {
     this.context = null;
     this.gain = null;
+    this.compressor = null;
     this.buffer = null;
     this.source = null;
     this.position = 0;
@@ -89,8 +91,15 @@ class ChartAudioPlayer {
     if (!this.context) {
       this.context = new AudioContextClass();
       this.gain = this.context.createGain();
+      this.compressor = this.context.createDynamicsCompressor();
       this.gain.gain.value = volumeSetting;
-      this.gain.connect(this.context.destination);
+      this.compressor.threshold.value = -8;
+      this.compressor.knee.value = 8;
+      this.compressor.ratio.value = 6;
+      this.compressor.attack.value = .002;
+      this.compressor.release.value = .12;
+      this.gain.connect(this.compressor);
+      this.compressor.connect(this.context.destination);
     }
     return this.context;
   }
@@ -194,6 +203,91 @@ class ChartAudioPlayer {
 }
 
 const audioPlayer = new ChartAudioPlayer();
+let hitNoiseBuffer = null;
+let lastSustainSoundAt = -Infinity;
+
+function createHitNoiseBuffer(context) {
+  if (hitNoiseBuffer?.sampleRate === context.sampleRate) return hitNoiseBuffer;
+  const length = Math.ceil(context.sampleRate * .045);
+  const buffer = context.createBuffer(1, length, context.sampleRate);
+  const channel = buffer.getChannelData(0);
+  let value = .4;
+  for (let index = 0; index < length; index += 1) {
+    value = value * .72 + (Math.random() * 2 - 1) * .28;
+    channel[index] = value * (1 - index / length);
+  }
+  hitNoiseBuffer = buffer;
+  return buffer;
+}
+
+function playHitSound(note, quality) {
+  const context = audioPlayer.context;
+  if (!context || context.state !== 'running' || quality === 'miss' || quality === 'bad') return;
+  const sustain = note.inputKind === 'sustain';
+  const performanceTime = performance.now();
+  if (sustain && performanceTime - lastSustainSoundAt < 34) return;
+  if (sustain) lastSustainSoundAt = performanceTime;
+
+  const critical = note.archetype.startsWith('Critical');
+  const flick = note.inputKind === 'flick';
+  const at = context.currentTime;
+  const duration = sustain ? .045 : flick ? .095 : .07;
+  const level = sustain ? .075 : quality === 'perfect' ? .19 : .14;
+  const oscillator = context.createOscillator();
+  const oscillatorGain = context.createGain();
+  oscillator.type = critical ? 'triangle' : 'sine';
+  const frequency = sustain ? 760 : critical ? 1420 : flick ? 1060 : 1180;
+  oscillator.frequency.setValueAtTime(frequency, at);
+  oscillator.frequency.exponentialRampToValueAtTime(flick ? frequency * 1.85 : frequency * .82, at + duration);
+  oscillatorGain.gain.setValueAtTime(.0001, at);
+  oscillatorGain.gain.exponentialRampToValueAtTime(level, at + .003);
+  oscillatorGain.gain.exponentialRampToValueAtTime(.0001, at + duration);
+  oscillator.connect(oscillatorGain);
+  oscillatorGain.connect(audioPlayer.gain);
+  oscillator.addEventListener('ended', () => {
+    oscillator.disconnect();
+    oscillatorGain.disconnect();
+  }, { once: true });
+  oscillator.start(at);
+  oscillator.stop(at + duration + .01);
+
+  const noise = context.createBufferSource();
+  const noiseFilter = context.createBiquadFilter();
+  const noiseGain = context.createGain();
+  noise.buffer = createHitNoiseBuffer(context);
+  noiseFilter.type = 'bandpass';
+  noiseFilter.frequency.value = critical ? 5200 : flick ? 4200 : 3600;
+  noiseFilter.Q.value = .8;
+  noiseGain.gain.setValueAtTime(sustain ? .025 : .08, at);
+  noiseGain.gain.exponentialRampToValueAtTime(.0001, at + (sustain ? .025 : .045));
+  noise.connect(noiseFilter);
+  noiseFilter.connect(noiseGain);
+  noiseGain.connect(audioPlayer.gain);
+  noise.addEventListener('ended', () => {
+    noise.disconnect();
+    noiseFilter.disconnect();
+    noiseGain.disconnect();
+  }, { once: true });
+  noise.start(at);
+
+  if (critical && !sustain) {
+    const overtone = context.createOscillator();
+    const overtoneGain = context.createGain();
+    overtone.type = 'sine';
+    overtone.frequency.setValueAtTime(frequency * 1.5, at);
+    overtoneGain.gain.setValueAtTime(.09, at);
+    overtoneGain.gain.exponentialRampToValueAtTime(.0001, at + .11);
+    overtone.connect(overtoneGain);
+    overtoneGain.connect(audioPlayer.gain);
+    overtone.addEventListener('ended', () => {
+      overtone.disconnect();
+      overtoneGain.disconnect();
+    }, { once: true });
+    overtone.start(at);
+    overtone.stop(at + .12);
+  }
+}
+
 const game = {
   parsed: null,
   level: null,
@@ -212,9 +306,9 @@ const game = {
   scoreWeight: 0,
   combo: 0,
   maxCombo: 0,
-  life: 100,
+  life: 1000,
   judged: 0,
-  counts: { perfect: 0, great: 0, good: 0, miss: 0 },
+  counts: { perfect: 0, great: 0, good: 0, bad: 0, miss: 0 },
   activePointers: new Map(),
   activeKeys: new Map(),
   inputQueue: [],
@@ -231,7 +325,7 @@ let settings = rhythmCore?.sanitizeSettings() || {
   scrollSpeed: 7,
   laneTilt: 100,
   laneWidth: 100,
-  judgmentLine: 86,
+  judgmentLine: 78,
   inputOffsetMs: 0,
   visualOffsetMs: 0,
 };
@@ -292,7 +386,7 @@ function updateVolume(value, persist = false) {
     audioPlayer.gain.gain.setValueAtTime(volumeSetting, audioPlayer.context.currentTime);
   }
   if (persist) {
-    try { localStorage.setItem('gugagame-web-volume', String(volumeSetting)); } catch {}
+    try { localStorage.setItem(RHYTHM_VOLUME_STORAGE_KEY, String(volumeSetting)); } catch {}
   }
   if (calibration.running && volumeSetting <= 0) {
     stopCalibration();
@@ -528,12 +622,12 @@ function resetScore() {
   game.scoreWeight = 0;
   game.combo = 0;
   game.maxCombo = 0;
-  game.life = 100;
+  game.life = 1000;
   game.judged = 0;
   game.audioEndedAt = null;
   game.audioEndChartTime = 0;
   game.tailPausedAt = null;
-  game.counts = { perfect: 0, great: 0, good: 0, miss: 0 };
+  game.counts = { perfect: 0, great: 0, good: 0, bad: 0, miss: 0 };
   game.activePointers.clear();
   game.activeKeys.clear();
   game.inputQueue = [];
@@ -559,11 +653,14 @@ function updateHud() {
   lifeValue.textContent = String(game.life);
 }
 
-function showJudgment(quality) {
+function showJudgment(quality, delta = null) {
   const now = performance.now();
-  if (quality !== 'miss' && now - game.lastJudgmentAt < 70) return;
+  if (quality !== 'miss' && now - game.lastJudgmentAt < 28) return;
   game.lastJudgmentAt = now;
   judgmentLabel.className = `judgment ${quality}`;
+  judgmentLabel.dataset.timing = Number.isFinite(delta) && Math.abs(delta) >= .01
+    ? delta < 0 ? 'EARLY' : 'LATE'
+    : '';
   judgmentLabel.textContent = quality.toUpperCase();
   void judgmentLabel.offsetWidth;
   judgmentLabel.classList.add('show');
@@ -572,53 +669,56 @@ function showJudgment(quality) {
 function recomputeScoreState() {
   let combo = 0;
   let maxCombo = 0;
-  let life = 100;
+  let life = 1000;
   let scoreWeight = 0;
   let judged = 0;
-  const counts = { perfect: 0, great: 0, good: 0, miss: 0 };
+  const counts = { perfect: 0, great: 0, good: 0, bad: 0, miss: 0 };
   game.scoreNotes.forEach((note) => {
     const quality = note.status;
     if (!Object.prototype.hasOwnProperty.call(counts, quality)) return;
     counts[quality] += 1;
     judged += 1;
-    if (quality === 'miss') {
+    if (quality === 'miss' || quality === 'bad' || quality === 'good') {
       combo = 0;
-      life = Math.max(0, life - 2);
-      return;
+      life = Math.max(0, life - (quality === 'miss' ? 100 : quality === 'bad' ? 80 : 40));
     }
-    scoreWeight += quality === 'perfect' ? 1000 : quality === 'great' ? 700 : 400;
-    combo += 1;
-    maxCombo = Math.max(maxCombo, combo);
-    life = Math.min(100, life + (quality === 'perfect' ? .08 : .03));
+    scoreWeight += quality === 'perfect' ? 1000 : quality === 'great' ? 700 : quality === 'good' ? 400 : 0;
+    if (quality === 'perfect' || quality === 'great') {
+      combo += 1;
+      maxCombo = Math.max(maxCombo, combo);
+    }
   });
   Object.assign(game, { combo, maxCombo, life, scoreWeight, judged, counts });
 }
 
-function registerJudgment(note, quality) {
+function registerJudgment(note, quality, delta = null) {
   const replacingMiss = note.status === 'miss' && quality !== 'miss';
   if (note.status !== 'pending' && !replacingMiss) return;
   note.status = quality;
+  playHitSound(note, quality);
   if (replacingMiss) {
     recomputeScoreState();
-    game.hitEffects.push({ lane: note.renderLane, size: note.renderSize, startedAt: performance.now(), quality });
-    showJudgment(quality);
+    game.hitEffects.push({ lane: note.renderLane, size: note.renderSize, startedAt: performance.now(), quality, inputKind: note.inputKind, critical: note.archetype.startsWith('Critical'), seed: note.index });
+    showJudgment(quality, delta);
     updateHud();
     return;
   }
   game.counts[quality] += 1;
   game.judged += 1;
-  if (quality === 'miss') {
+  if (quality === 'miss' || quality === 'bad' || quality === 'good') {
     game.combo = 0;
-    game.life = Math.max(0, game.life - 2);
-  } else {
+    game.life = Math.max(0, game.life - (quality === 'miss' ? 100 : quality === 'bad' ? 80 : 40));
+  }
+  if (quality !== 'miss' && quality !== 'bad') {
     const weight = quality === 'perfect' ? 1000 : quality === 'great' ? 700 : 400;
     game.scoreWeight += weight;
-    game.combo += 1;
-    game.maxCombo = Math.max(game.maxCombo, game.combo);
-    game.life = Math.min(100, game.life + (quality === 'perfect' ? .08 : .03));
-    game.hitEffects.push({ lane: note.renderLane, size: note.renderSize, startedAt: performance.now(), quality });
+    if (quality === 'perfect' || quality === 'great') {
+      game.combo += 1;
+      game.maxCombo = Math.max(game.maxCombo, game.combo);
+    }
+    game.hitEffects.push({ lane: note.renderLane, size: note.renderSize, startedAt: performance.now(), quality, inputKind: note.inputKind, critical: note.archetype.startsWith('Critical'), seed: note.index });
   }
-  showJudgment(quality);
+  showJudgment(quality, delta);
   updateHud();
 }
 
@@ -636,7 +736,7 @@ function activeLanes() {
 function judgeInputAt(lane, inputKind, now, gestureDirection = null) {
   const candidate = rhythmCore.selectInputCandidate(game.scoreNotes, lane, now, inputKind, gestureDirection);
   if (!candidate) return false;
-  registerJudgment(candidate.note, candidate.quality);
+  registerJudgment(candidate.note, candidate.quality, candidate.delta);
   return true;
 }
 
@@ -702,10 +802,13 @@ function firstNoteAtOrAfter(chartTime) {
 
 function resolveSustainRange(lane, start, end, owner) {
   if (end < start) return;
-  for (let index = firstNoteAtOrAfter(start); index < game.scoreNotes.length; index += 1) {
+  for (let index = firstNoteAtOrAfter(start - rhythmCore.SUSTAIN_WINDOW); index < game.scoreNotes.length; index += 1) {
     const note = game.scoreNotes[index];
     if (note.time > end) break;
-    if (note.inputKind === 'sustain' && ['pending', 'miss'].includes(note.status) && laneMatches(note, lane)) {
+    const coveredAtTarget = note.time >= start;
+    const recoveredByLateContact = start - note.time <= rhythmCore.SUSTAIN_WINDOW;
+    if (note.inputKind === 'sustain' && ['pending', 'miss'].includes(note.status)
+      && laneMatches(note, lane) && (coveredAtTarget || recoveredByLateContact)) {
       note.holdOwner = owner;
       registerJudgment(note, 'perfect');
     }
@@ -743,7 +846,7 @@ function correctSustainsAfterRelease(owner, releasedAt, now) {
       continue;
     }
     note.holdOwner = null;
-    note.status = rhythmCore.shouldCommitMiss(note.time, now, MISS_COMMIT_GRACE) ? 'miss' : 'pending';
+    note.status = rhythmCore.shouldCommitMiss(note.time, now, MISS_COMMIT_GRACE, rhythmCore.SUSTAIN_WINDOW) ? 'miss' : 'pending';
     changed = true;
   }
   if (changed) {
@@ -755,16 +858,25 @@ function correctSustainsAfterRelease(owner, releasedAt, now) {
 function updateJudgments(now) {
   game.scoreNotes.forEach((note) => {
     if (note.inputKind === 'sustain' && note.status === 'pending') {
-      const hold = now >= note.time ? holdAt(note, note.time) : null;
-      if (hold && rhythmCore.sustainQualityAt(note.time, now, true)) {
+      const targetHold = now >= note.time ? holdAt(note, note.time) : null;
+      const lateHold = !targetHold && rhythmCore.sustainQualityAt(note.time, now, true)
+        ? [...game.openHolds.values()].find((active) => laneMatches(note, active.lane))
+        : null;
+      const hold = targetHold || lateHold;
+      if (hold) {
         note.holdOwner = hold.owner;
         registerJudgment(note, 'perfect');
-      } else if (rhythmCore.shouldCommitMiss(note.time, now, MISS_COMMIT_GRACE)) {
+      } else if (rhythmCore.shouldCommitMiss(note.time, now, MISS_COMMIT_GRACE, rhythmCore.SUSTAIN_WINDOW)) {
         registerJudgment(note, 'miss');
       }
       return;
     }
-    if (note.status === 'pending' && rhythmCore.shouldCommitMiss(note.time, now, MISS_COMMIT_GRACE)) {
+    if (note.status === 'pending' && rhythmCore.shouldCommitMiss(
+      note.time,
+      now,
+      MISS_COMMIT_GRACE,
+      rhythmCore.profileForNote(note).badAfter,
+    )) {
       registerJudgment(note, 'miss');
     }
   });
@@ -814,6 +926,12 @@ function deltaToY(delta, geometry) {
   return geometry.horizonY + Math.pow(Math.max(0, progress), 1.35) * (geometry.judgmentY - geometry.horizonY);
 }
 
+function roundedRectPath(x, y, width, height, radius) {
+  ctx.beginPath();
+  if (typeof ctx.roundRect === 'function') ctx.roundRect(x, y, width, height, radius);
+  else ctx.rect(x, y, width, height);
+}
+
 function drawBackground() {
   const width = window.innerWidth;
   const height = window.innerHeight;
@@ -824,60 +942,138 @@ function drawBackground() {
     const drawWidth = image.width * scale;
     const drawHeight = image.height * scale;
     ctx.save();
-    ctx.globalAlpha = .28;
+    ctx.globalAlpha = .24;
     ctx.drawImage(image, (width - drawWidth) / 2, (height - drawHeight) / 2, drawWidth, drawHeight);
     ctx.restore();
   }
   const gradient = ctx.createLinearGradient(0, 0, 0, height);
-  gradient.addColorStop(0, '#07101ad9');
-  gradient.addColorStop(.55, '#101b2ed9');
-  gradient.addColorStop(1, '#08101cf7');
+  gradient.addColorStop(0, '#071334d9');
+  gradient.addColorStop(.48, '#101b4bc9');
+  gradient.addColorStop(.78, '#14204fdc');
+  gradient.addColorStop(1, '#080c27fa');
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, width, height);
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const bandTop = height * .42;
+  const bandHeight = height * .26;
+  const barWidth = Math.max(5, width / 105);
+  for (let index = 0; index < Math.ceil(width / (barWidth * 1.7)); index += 1) {
+    const x = index * barWidth * 1.7;
+    const strength = .18 + ((Math.sin(index * 2.17) + 1) / 2) * .7;
+    const barGradient = ctx.createLinearGradient(0, bandTop, 0, bandTop + bandHeight);
+    barGradient.addColorStop(0, '#6955e000');
+    barGradient.addColorStop(.45, index % 3 ? '#3177cf45' : '#7f48c754');
+    barGradient.addColorStop(1, index % 2 ? '#26d5db66' : '#a343d966');
+    ctx.fillStyle = barGradient;
+    const segments = 3 + Math.round(strength * 8);
+    for (let segment = 0; segment < segments; segment += 1) {
+      const y = bandTop + bandHeight - segment * 9;
+      ctx.fillRect(x, y, barWidth, 5);
+    }
+  }
+  const accents = [
+    [.08, .2, '#16aee055'], [.18, .73, '#b83cd755'], [.77, .22, '#884de055'],
+    [.87, .66, '#2bdbd555'], [.94, .36, '#bd3bc755'], [.29, .53, '#5369e955'],
+  ];
+  accents.forEach(([x, y, color], index) => {
+    const size = 18 + (index % 3) * 9;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(width * x, height * y - size);
+    ctx.lineTo(width * x + size * 1.7, height * y + size);
+    ctx.lineTo(width * x - size, height * y + size * .55);
+    ctx.closePath();
+    ctx.fill();
+  });
+  ctx.restore();
 }
 
 function drawStage(geometry) {
   const horizon = geometry.horizonY;
   const judgment = geometry.judgmentY;
+  const bottom = geometry.height + 12;
+  const farLeft = laneToX(-6, horizon, geometry);
+  const farRight = laneToX(6, horizon, geometry);
+  const nearLeft = laneToX(-6, judgment, geometry);
+  const nearRight = laneToX(6, judgment, geometry);
   ctx.beginPath();
-  ctx.moveTo(laneToX(-6, horizon, geometry), horizon);
-  ctx.lineTo(laneToX(6, horizon, geometry), horizon);
-  ctx.lineTo(laneToX(6, judgment, geometry), judgment);
-  ctx.lineTo(laneToX(-6, judgment, geometry), judgment);
+  ctx.moveTo(farLeft, horizon);
+  ctx.lineTo(farRight, horizon);
+  ctx.lineTo(nearRight, bottom);
+  ctx.lineTo(nearLeft, bottom);
   ctx.closePath();
-  ctx.fillStyle = '#16253db8';
+  const fieldGradient = ctx.createLinearGradient(0, horizon, 0, bottom);
+  fieldGradient.addColorStop(0, '#121a3d96');
+  fieldGradient.addColorStop(.65, '#121733c7');
+  fieldGradient.addColorStop(1, '#090b20ed');
+  ctx.fillStyle = fieldGradient;
   ctx.fill();
+
+  ctx.save();
+  ctx.shadowColor = '#95c8ff';
+  ctx.shadowBlur = 7;
   for (let lane = -6; lane <= 6; lane += 2) {
     ctx.beginPath();
     ctx.moveTo(laneToX(lane, horizon, geometry), horizon);
-    ctx.lineTo(laneToX(lane, judgment, geometry), judgment);
-    ctx.strokeStyle = lane === 0 ? '#9be7ff55' : '#b5d5ed25';
-    ctx.lineWidth = lane === 0 ? 2 : 1;
+    ctx.lineTo(laneToX(lane, bottom, geometry), bottom);
+    ctx.strokeStyle = lane === 0 ? '#d4e9ff72' : '#c7d9ff42';
+    ctx.lineWidth = lane === 0 ? 1.6 : 1;
     ctx.stroke();
   }
-  ctx.beginPath();
-  ctx.moveTo(laneToX(-6, judgment, geometry), judgment);
-  ctx.lineTo(laneToX(6, judgment, geometry), judgment);
-  ctx.strokeStyle = '#e7fbff';
-  ctx.shadowColor = '#67e8f9';
-  ctx.shadowBlur = 16;
-  ctx.lineWidth = 5;
-  ctx.stroke();
-  ctx.shadowBlur = 0;
+  for (let index = 1; index <= 10; index += 1) {
+    const progress = index / 10;
+    const y = horizon + Math.pow(progress, 1.55) * (judgment - horizon);
+    ctx.beginPath();
+    ctx.moveTo(laneToX(-6, y, geometry), y);
+    ctx.lineTo(laneToX(6, y, geometry), y);
+    ctx.strokeStyle = `rgba(180,203,255,${.08 + progress * .15})`;
+    ctx.lineWidth = progress > .85 ? 1.5 : 1;
+    ctx.stroke();
+  }
+  ctx.restore();
 
   const active = activeLanes();
+  active.forEach((lane) => {
+    const center = laneToX(lane, judgment, geometry);
+    const laneWidth = geometry.nearWidth / 6;
+    const glow = ctx.createLinearGradient(0, judgment - 150, 0, bottom);
+    glow.addColorStop(0, '#71f7ff00');
+    glow.addColorStop(.72, '#71f7ff42');
+    glow.addColorStop(1, '#a46cff52');
+    ctx.fillStyle = glow;
+    ctx.fillRect(center - laneWidth * .48, judgment - 150, laneWidth * .96, bottom - judgment + 150);
+  });
+
+  const platformHeight = Math.max(13, geometry.height * .021);
+  const platformGradient = ctx.createLinearGradient(0, judgment - platformHeight / 2, 0, judgment + platformHeight / 2);
+  platformGradient.addColorStop(0, '#ffffffed');
+  platformGradient.addColorStop(.28, '#bdf6ff');
+  platformGradient.addColorStop(.55, '#945cff');
+  platformGradient.addColorStop(1, '#de48ff');
+  ctx.fillStyle = platformGradient;
+  ctx.shadowColor = '#d64cff';
+  ctx.shadowBlur = 22;
+  ctx.fillRect(nearLeft, judgment - platformHeight / 2, nearRight - nearLeft, platformHeight);
+  ctx.shadowBlur = 0;
+  ctx.beginPath();
+  ctx.moveTo(nearLeft, judgment - platformHeight / 2);
+  ctx.lineTo(nearRight, judgment - platformHeight / 2);
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
   [...KEY_LANES.entries()].forEach(([key, lane]) => {
-    const y = Math.min(judgment + 18, geometry.height - 36);
+    const y = Math.min(judgment + platformHeight + 10, geometry.height - 30);
     const x = laneToX(lane, judgment, geometry);
-    ctx.fillStyle = active.includes(lane) ? '#67e8f9' : '#ffffff32';
-    ctx.beginPath();
-    ctx.roundRect?.(x - 22, y, 44, 30, 8);
-    if (typeof ctx.roundRect !== 'function') ctx.rect(x - 22, y, 44, 30);
+    ctx.fillStyle = active.includes(lane) ? '#8ffcffd9' : '#ffffff18';
+    roundedRectPath(x - 18, y, 36, 24, 6);
     ctx.fill();
-    ctx.fillStyle = '#fff';
-    ctx.font = '900 13px system-ui';
+    ctx.fillStyle = active.includes(lane) ? '#132957' : '#d9e9ffb5';
+    ctx.font = '900 11px system-ui';
     ctx.textAlign = 'center';
-    ctx.fillText(key.toUpperCase(), x, y + 20);
+    ctx.fillText(key.toUpperCase(), x, y + 16);
   });
 }
 
@@ -903,12 +1099,22 @@ function drawConnector(entry, now, geometry) {
   ctx.lineTo(endLeft, endY);
   ctx.closePath();
   const gradient = ctx.createLinearGradient(0, startY, 0, endY);
-  gradient.addColorStop(0, critical ? '#ffe66d72' : '#56e39f60');
-  gradient.addColorStop(1, critical ? '#ffbb3472' : '#2bd9c360');
+  gradient.addColorStop(0, critical ? '#fff89a45' : '#c3fff547');
+  gradient.addColorStop(.5, critical ? '#ffd85395' : '#65f7c99a');
+  gradient.addColorStop(1, critical ? '#fff06ab8' : '#69f4d0bd');
   ctx.fillStyle = gradient;
+  ctx.shadowColor = critical ? '#ffd84f' : '#5dffd2';
+  ctx.shadowBlur = 14;
   ctx.fill();
-  ctx.strokeStyle = critical ? '#ffe66db8' : '#69f0b4a0';
-  ctx.lineWidth = 2;
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = critical ? '#fff083e8' : '#9affd9d9';
+  ctx.lineWidth = 2.5;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo((startLeft + startRight) / 2, startY);
+  ctx.lineTo((endLeft + endRight) / 2, endY);
+  ctx.strokeStyle = '#ffffff45';
+  ctx.lineWidth = Math.max(1, Math.min(4, (startRight - startLeft) * .04));
   ctx.stroke();
 }
 
@@ -936,6 +1142,18 @@ function noteColor(note) {
   return '#7cc9ff';
 }
 
+function notePalette(note) {
+  const critical = note.archetype.startsWith('Critical');
+  const flick = note.archetype.includes('Flick');
+  const sustain = note.inputKind === 'sustain';
+  if (flick) return critical
+    ? { edge: '#ffae24', top: '#fffbd3', middle: '#ffd34e', bottom: '#ff9f24', glow: '#ffcf3f' }
+    : { edge: '#df3b90', top: '#fff1fa', middle: '#ff92ca', bottom: '#ed4b9b', glow: '#ff68b5' };
+  if (critical) return { edge: '#f0a629', top: '#fffde3', middle: '#ffe678', bottom: '#ffb92f', glow: '#ffd858' };
+  if (sustain) return { edge: '#25b783', top: '#e9fff8', middle: '#79f5c4', bottom: '#3bd99e', glow: '#61efbf' };
+  return { edge: '#6471d9', top: '#f7f3ff', middle: '#c4c8ff', bottom: '#77d9ed', glow: '#9ca9ff' };
+}
+
 function shouldRenderNote(note) {
   return note.renderLane !== null
     && !note.archetype.startsWith('Hidden')
@@ -950,27 +1168,52 @@ function drawNote(note, now, geometry) {
   const y = deltaToY(delta, geometry);
   const left = laneToX(note.renderLane - note.renderSize, y, geometry);
   const right = laneToX(note.renderLane + note.renderSize, y, geometry);
-  const height = note.archetype.includes('Trace') ? 8 : note.archetype.includes('SlideTick') ? 7 : 13;
+  const perspective = clamp((y - geometry.horizonY) / Math.max(1, geometry.judgmentY - geometry.horizonY), 0, 1);
+  const compact = note.archetype.includes('Trace') || note.archetype.includes('SlideTick');
+  const height = (compact ? 7 : 10) + perspective * (compact ? 8 : 13);
+  const width = Math.max(6, right - left);
+  const radius = Math.min(height * .34, 7);
+  const palette = notePalette(note);
   ctx.save();
-  ctx.shadowColor = noteColor(note);
-  ctx.shadowBlur = 13;
-  ctx.fillStyle = noteColor(note);
-  ctx.beginPath();
-  if (typeof ctx.roundRect === 'function') ctx.roundRect(left, y - height / 2, Math.max(4, right - left), height, 5);
-  else ctx.rect(left, y - height / 2, Math.max(4, right - left), height);
+  ctx.shadowColor = palette.glow;
+  ctx.shadowBlur = 17;
+  ctx.fillStyle = palette.edge;
+  roundedRectPath(left, y - height / 2, width, height, radius);
   ctx.fill();
   ctx.shadowBlur = 0;
-  ctx.strokeStyle = '#ffffffd8';
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
+  const face = ctx.createLinearGradient(0, y - height / 2, 0, y + height / 2);
+  face.addColorStop(0, palette.top);
+  face.addColorStop(.34, palette.middle);
+  face.addColorStop(1, palette.bottom);
+  ctx.fillStyle = face;
+  roundedRectPath(left + 2, y - height / 2 + 2, Math.max(2, width - 4), Math.max(2, height - 4), Math.max(1, radius - 2));
+  ctx.fill();
+  ctx.fillStyle = '#ffffffa8';
+  roundedRectPath(left + width * .08, y - height * .27, width * .84, Math.max(2, height * .18), 3);
+  ctx.fill();
+  ctx.fillStyle = palette.edge;
+  const capWidth = Math.min(8, width * .13);
+  roundedRectPath(left + 4, y - height * .1, capWidth, height * .28, 2);
+  ctx.fill();
+  roundedRectPath(right - capWidth - 4, y - height * .1, capWidth, height * .28, 2);
+  ctx.fill();
   if (note.archetype.includes('Flick')) {
     const direction = note.direction || 0;
     const center = (left + right) / 2;
+    const arrowWidth = Math.max(12, Math.min(30, width * .28));
+    const arrowTop = y - height * .72 - 15;
     ctx.beginPath();
-    ctx.moveTo(center - 9 + direction * 3, y - 12);
-    ctx.lineTo(center + direction * 8, y - 20);
-    ctx.lineTo(center + 9 + direction * 3, y - 12);
-    ctx.strokeStyle = '#fff';
+    ctx.moveTo(center - arrowWidth + direction * 4, arrowTop + 9);
+    ctx.lineTo(center + direction * arrowWidth * .55, arrowTop);
+    ctx.lineTo(center + arrowWidth + direction * 4, arrowTop + 9);
+    ctx.strokeStyle = palette.edge;
+    ctx.shadowColor = palette.glow;
+    ctx.shadowBlur = 10;
+    ctx.lineWidth = 8;
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+    ctx.strokeStyle = '#fff6';
+    ctx.shadowBlur = 0;
     ctx.lineWidth = 3;
     ctx.stroke();
   }
@@ -980,16 +1223,56 @@ function drawNote(note, now, geometry) {
 function drawHitEffects(geometry) {
   const now = performance.now();
   const judgmentY = geometry.judgmentY;
-  game.hitEffects = game.hitEffects.filter((effect) => now - effect.startedAt < 300);
+  game.hitEffects = game.hitEffects.filter((effect) => now - effect.startedAt < 430);
   game.hitEffects.forEach((effect) => {
-    const progress = (now - effect.startedAt) / 300;
+    const progress = (now - effect.startedAt) / 430;
+    const fade = Math.pow(1 - progress, 1.6);
     const x = laneToX(effect.lane, judgmentY, geometry);
-    const radius = 18 + progress * 48;
+    const halfWidth = geometry.nearWidth / 12 * (effect.size + .7);
+    const color = effect.critical ? '255,221,83' : effect.quality === 'great' ? '255,128,222' : '108,239,255';
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const beam = ctx.createLinearGradient(0, judgmentY - 125, 0, judgmentY + 35);
+    beam.addColorStop(0, `rgba(${color},0)`);
+    beam.addColorStop(.74, `rgba(${color},${fade * .24})`);
+    beam.addColorStop(1, `rgba(255,255,255,${fade * .58})`);
+    ctx.fillStyle = beam;
     ctx.beginPath();
-    ctx.arc(x, judgmentY, radius, 0, Math.PI * 2);
-    ctx.strokeStyle = effect.quality === 'perfect' ? `rgba(255,230,109,${1 - progress})` : `rgba(103,232,249,${1 - progress})`;
-    ctx.lineWidth = 4 * (1 - progress);
-    ctx.stroke();
+    ctx.moveTo(x - halfWidth * (.35 + progress), judgmentY - 120 * (1 - progress * .4));
+    ctx.lineTo(x + halfWidth * (.35 + progress), judgmentY - 120 * (1 - progress * .4));
+    ctx.lineTo(x + halfWidth * (1.25 + progress), judgmentY + 22);
+    ctx.lineTo(x - halfWidth * (1.25 + progress), judgmentY + 22);
+    ctx.closePath();
+    ctx.fill();
+    ctx.shadowColor = `rgb(${color})`;
+    ctx.shadowBlur = 22;
+    ctx.fillStyle = `rgba(${color},${fade * .75})`;
+    roundedRectPath(x - halfWidth * (1 + progress), judgmentY - 5, halfWidth * 2 * (1 + progress), 10, 5);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    for (let index = 0; index < 10; index += 1) {
+      const angle = ((effect.seed * .73 + index * 2.39) % 6.28) - Math.PI;
+      const distance = (22 + (index % 5) * 13) * progress;
+      const particleX = x + Math.cos(angle) * distance * 1.8;
+      const particleY = judgmentY - 5 + Math.sin(angle) * distance - progress * 28;
+      const size = (5 + index % 3 * 2) * fade;
+      ctx.save();
+      ctx.translate(particleX, particleY);
+      ctx.rotate(Math.PI / 4 + angle);
+      ctx.fillStyle = `rgba(${color},${fade})`;
+      ctx.fillRect(-size / 2, -size / 2, size, size);
+      ctx.restore();
+    }
+    if (effect.inputKind === 'flick') {
+      const direction = effect.seed % 2 ? 1 : -1;
+      ctx.strokeStyle = `rgba(${color},${fade})`;
+      ctx.lineWidth = 6 * fade;
+      ctx.beginPath();
+      ctx.moveTo(x - direction * 26, judgmentY - 30);
+      ctx.lineTo(x + direction * (40 + progress * 90), judgmentY - 70 - progress * 24);
+      ctx.stroke();
+    }
+    ctx.restore();
   });
 }
 
@@ -1014,7 +1297,7 @@ function gameLoop(frameTimestamp = performance.now()) {
   }
   drawScene(visualNow);
   const lastNoteTime = game.scoreNotes.at(-1)?.time ?? -Infinity;
-  const inputSettled = judgmentNow >= lastNoteTime + rhythmCore.JUDGMENT_WINDOWS.good + INPUT_SETTLE_GRACE;
+  const inputSettled = judgmentNow >= lastNoteTime + rhythmCore.JUDGMENT_WINDOWS.bad + INPUT_SETTLE_GRACE;
   const audioSettled = game.audioEndedAt !== null
     && frameTimestamp >= game.audioEndedAt + INPUT_SETTLE_GRACE * 1000;
   const controlsSettled = game.inputQueue.length === 0
@@ -1060,7 +1343,7 @@ async function startGame() {
 }
 
 function resultRank(accuracy) {
-  if (game.counts.miss === 0 && accuracy >= .99) return 'SS';
+  if (game.counts.miss === 0 && game.counts.bad === 0 && accuracy >= .99) return 'SS';
   if (accuracy >= .95) return 'S';
   if (accuracy >= .88) return 'A';
   if (accuracy >= .75) return 'B';
@@ -1089,6 +1372,7 @@ function finishGame() {
   document.querySelector('#result-perfect').textContent = game.counts.perfect.toLocaleString();
   document.querySelector('#result-great').textContent = game.counts.great.toLocaleString();
   document.querySelector('#result-good').textContent = game.counts.good.toLocaleString();
+  document.querySelector('#result-bad').textContent = game.counts.bad.toLocaleString();
   document.querySelector('#result-miss').textContent = game.counts.miss.toLocaleString();
   resultPanel.hidden = false;
   drawScene(finalVisualTime);
@@ -1361,7 +1645,9 @@ function tryPointerFlick(pointer, sample) {
     minVelocityPxPerSecond: FLICK_MIN_VELOCITY,
   });
   if (!gesture) return false;
-  queueInputAt(pointer.lane, 'flick', sample.chartTime, gesture.direction);
+  // Flick timing starts at contact. Waiting for the movement threshold adds a
+  // device-dependent delay and makes an on-beat gesture feel consistently late.
+  queueInputAt(pointer.pressedLane, 'flick', pointer.pressedAt, gesture.direction);
   pointer.flicked = true;
   return true;
 }
@@ -1376,6 +1662,8 @@ canvas.addEventListener('pointerdown', (event) => {
   const pointer = {
     owner,
     lane,
+    pressedLane: lane,
+    pressedAt: chartTime,
     samples: [{ x: event.clientX, y: event.clientY, performanceTime, chartTime }],
     flicked: false,
   };
@@ -1388,7 +1676,10 @@ canvas.addEventListener('pointermove', (event) => {
   const pointer = game.activePointers.get(event.pointerId);
   if (!pointer || game.paused) return;
   event.preventDefault();
-  tryPointerFlick(pointer, updatePointerState(pointer, event));
+  const samples = event.getCoalescedEvents?.() || [event];
+  samples.forEach((sampleEvent) => {
+    tryPointerFlick(pointer, updatePointerState(pointer, sampleEvent));
+  });
 });
 function releasePointer(event) {
   const pointer = game.activePointers.get(event.pointerId);
@@ -1435,7 +1726,8 @@ window.addEventListener('keyup', (event) => {
   const chartTime = currentJudgmentChartTime(event.timeStamp);
   endHold(input.owner, chartTime);
   if (game.running && !game.paused && chartTime - input.pressedAt <= .3) {
-    queueInputAt(input.lane, 'flick', chartTime);
+    // Key-up confirms flick intent, but the musical input happened on key-down.
+    queueInputAt(input.lane, 'flick', input.pressedAt);
   }
   game.activeKeys.delete(key);
 });

@@ -18,7 +18,7 @@ test('sanitizes persisted settings while preserving safe custom values', () => {
     scrollSpeed: 8.3,
     laneTilt: 100,
     laneWidth: 72,
-    judgmentLine: 86,
+    judgmentLine: 78,
     inputOffsetMs: -300,
     visualOffsetMs: 31,
   });
@@ -88,14 +88,22 @@ test('a delayed callback still judges from its event timestamp', () => {
   assert.ok(Math.abs(candidate.delta) < 1e-9);
 });
 
-test('an earlier pending note cannot be stolen by a closer later note', () => {
+test('dense inputs target the closest note instead of a stale earlier note', () => {
   const notes = [
     { index: 1, time: 1, status: 'pending', inputKind: 'direct', renderLane: 1, renderSize: .5 },
     { index: 2, time: 1.2, status: 'pending', inputKind: 'direct', renderLane: 1, renderSize: .5 },
   ];
   const candidate = core.selectInputCandidate(notes, 1, 1.12, 'direct');
-  assert.equal(candidate.note.index, 1);
-  assert.equal(candidate.quality, 'good');
+  assert.equal(candidate.note.index, 2);
+  assert.equal(candidate.quality, 'great');
+});
+
+test('equal-distance notes resolve toward the earlier note deterministically', () => {
+  const notes = [
+    { index: 2, time: 1.2, status: 'pending', inputKind: 'direct', renderLane: 0, renderSize: .5 },
+    { index: 1, time: 1, status: 'pending', inputKind: 'direct', renderLane: 0, renderSize: .5 },
+  ];
+  assert.equal(core.selectInputCandidate(notes, 0, 1.1, 'direct').note.index, 1);
 });
 
 test('a timestamp-valid queued input can replace a provisional miss', () => {
@@ -105,12 +113,34 @@ test('a timestamp-valid queued input can replace a provisional miss', () => {
   assert.equal(candidate.quality, 'perfect');
 });
 
-test('pre-holding sustain waits for target time instead of scoring early Good', () => {
+test('sustain recovery uses the five-frame Project Sekai contact window', () => {
   assert.equal(core.sustainQualityAt(2, 1.82, true), null);
   assert.equal(core.sustainQualityAt(2, 2, true), 'perfect');
-  assert.equal(core.sustainQualityAt(2, 2.12, true), 'perfect');
-  assert.equal(core.sustainQualityAt(2, 2.5, true), 'perfect');
+  assert.equal(core.sustainQualityAt(2, 2.08, true), 'perfect');
+  assert.equal(core.sustainQualityAt(2, 2.084, true), null);
   assert.equal(core.sustainQualityAt(2, 2, false), null);
+});
+
+test('judgment profiles match Project Sekai frame windows', () => {
+  assert.equal(core.qualityForDelta(.041), 'perfect');
+  assert.equal(core.qualityForDelta(.042), 'great');
+  assert.equal(core.qualityForDelta(.084), 'good');
+  assert.equal(core.qualityForDelta(.109), 'bad');
+  assert.equal(core.qualityForDelta(.126), null);
+
+  const critical = core.profileForNote({ archetype: 'CriticalTapNote' });
+  assert.equal(core.qualityForDelta(.054, critical), 'perfect');
+  assert.equal(core.qualityForDelta(.056, critical), 'great');
+
+  const flick = core.profileForNote({ archetype: 'NormalFlickNote' });
+  assert.equal(core.qualityForDelta(.13, flick), 'good');
+  assert.equal(core.qualityForDelta(.14, flick), 'bad');
+});
+
+test('spatial judgment adds touch forgiveness outside the drawn note', () => {
+  const note = { renderLane: 0, renderSize: .5 };
+  assert.equal(core.laneMatches(note, 1.3), true);
+  assert.equal(core.laneMatches(note, 1.4), false);
 });
 
 test('flicks require the requested horizontal direction when one is specified', () => {

@@ -77,3 +77,28 @@ test('rhythm setup exposes calibration before chart selection and loads timing c
     .forEach((id) => assert.match(html, new RegExp(`id=["']${id}["']`)));
   assert.equal((html.match(/data-calibration-beat=/g) ?? []).length, 4);
 });
+
+test('flick confirmation preserves the contact lane and timestamp', () => {
+  const source = read('scp-game.js');
+  assert.match(source, /queueInputAt\(pointer\.pressedLane, 'flick', pointer\.pressedAt, gesture\.direction\)/);
+  assert.match(source, /queueInputAt\(input\.lane, 'flick', input\.pressedAt\)/);
+  assert.match(source, /event\.getCoalescedEvents\?\.\(\)/);
+  assert.doesNotMatch(source, /queueInputAt\(pointer\.lane, 'flick', sample\.chartTime/);
+});
+
+test('rhythm feedback is synthesized locally and includes expanded hit effects', () => {
+  const source = read('scp-game.js');
+  assert.match(source, /function playHitSound\(note, quality\)/);
+  assert.match(source, /context\.createOscillator\(\)/);
+  assert.match(source, /createHitNoiseBuffer\(context\)/);
+  assert.match(source, /globalCompositeOperation = 'lighter'/);
+  assert.match(source, /effect\.critical/);
+});
+
+test('rhythm volume is isolated from the main game volume preference', () => {
+  const rhythm = read('scp-game.js');
+  const main = read('app.js');
+  assert.match(main, /VOLUME_STORAGE_KEY = 'gugagame-web-volume'/);
+  assert.match(rhythm, /RHYTHM_VOLUME_STORAGE_KEY = 'gugagame-rhythm-volume-v1'/);
+  assert.doesNotMatch(rhythm, /localStorage\.(?:getItem|setItem)\('gugagame-web-volume'/);
+});
