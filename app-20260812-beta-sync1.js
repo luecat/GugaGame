@@ -453,7 +453,7 @@ function createSound(path) {
   };
 }
 
-const hurtSound = createSound('audio/死亡音效.wav');
+const hurtSound = createSound('audio/咿.wav');
 const landingSound = createSound('audio/落地.wav');
 const screamSound = createSound('audio/咿.wav');
 const deathSound = createSound('audio/痾啊.wav');
@@ -2737,10 +2737,8 @@ function triggerDeath(cause = '企鵝失去了所有血量') {
     if (event.animationName !== 'death-jumpscare') return;
     pet.removeEventListener('animationstart', syncScreamWithJumpscare);
     if (!isDead) return;
-    playScreamSound();
     window.setTimeout(() => {
       if (!isDead) return;
-      stopSound(screamSound);
       playDeathSound();
       deathScreen.classList.add('is-visible');
       deathScreen.setAttribute('aria-hidden', 'false');
