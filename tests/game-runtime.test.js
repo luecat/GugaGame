@@ -60,6 +60,8 @@ test('async games have cancellation and timeout escape paths', () => {
 test('background suspension clears active loops and delayed audio', () => {
   assert.match(source, /document\.addEventListener\('visibilitychange'/);
   assert.match(source, /window\.addEventListener\('pagehide', suspendRuntime\)/);
+  assert.doesNotMatch(source, /window\.addEventListener\('blur', suspendRuntime\)/);
+  assert.doesNotMatch(source, /window\.addEventListener\('focus', resumeRuntime\)/);
   assert.match(source, /gameSounds\.forEach\(stopSound\)/);
   assert.match(source, /generation !== sound\.playbackGeneration \|\| runtimeSuspended/);
   assert.match(source, /getActiveRuntimeMode\(\) !== 'main' \|\| songInvitation\.open/);
