@@ -28,4 +28,4 @@
 
 ## Cloudflare Pages
 
-https://luecat.com/
+https://gugagame.luecat.com/

@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://luecat.com/sitemap.xml
+Sitemap: https://gugagame.luecat.com/sitemap.xml
